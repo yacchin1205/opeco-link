@@ -10,9 +10,9 @@ struct MacJoinView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Add Session")
                 .font(.title2.weight(.semibold))
-            Text("Paste the one-shot link shown by notifyg.")
+            Text("Paste the one-shot link shown by opeco.")
                 .foregroundStyle(.secondary)
-            TextField("https://notify.guru/…#…", text: $link)
+            TextField("https://opeco.link/…#…", text: $link)
                 .textFieldStyle(.roundedBorder)
                 .onSubmit { beginJoin() }
             if let error = model.errorMessage {

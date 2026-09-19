@@ -16,7 +16,7 @@ struct JoinSessionView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
 
-                TextField("https://notify.guru/…#…", text: $pairingLink, axis: .vertical)
+                TextField("https://opeco.link/…#…", text: $pairingLink, axis: .vertical)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .textContentType(.URL)
@@ -36,8 +36,10 @@ struct JoinSessionView: View {
             .safeAreaInset(edge: .bottom) { OperationErrorView() }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { isPresented = false }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Close", systemImage: "xmark") { isPresented = false }
+                        .labelStyle(.iconOnly)
+                        .buttonBorderShape(.circle)
                 }
             }
         }

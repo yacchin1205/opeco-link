@@ -66,7 +66,7 @@ private struct ShareView: View {
                 Button("Cancel") { context.cancelRequest(withError: CocoaError(.userCancelled)) }
                     .accessibilityIdentifier("share-cancel")
                 Spacer()
-                Text("notify.guru").font(.headline)
+                Text("opeco").font(.headline)
                 Spacer()
                 Button("Send") { Task { await send() } }
                 .disabled(loading || sending || resultUnknown || destination.isEmpty || (images.isEmpty && message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) || images.count > 5 || images.contains { $0.photo == nil })
@@ -146,14 +146,14 @@ private struct ShareView: View {
                 catch { images[index].error = error.localizedDescription }
             }
             guard let saved = try KeychainVault().load(), let group = saved.identity.group else {
-                error = "Open notify.guru and join a session first."
+                error = "Open opeco and join a session first."
                 return
             }
             vault = saved
             destinations = saved.sessions.filter {
                 $0.protocolVersion == 4 && $0.groupID == group.groupID && $0.expiresAt > Int64(Date().timeIntervalSince1970 * 1000)
             }.sorted { ($0.updatedAt ?? 0) > ($1.updatedAt ?? 0) }
-            if destinations.isEmpty { error = "Open notify.guru and join a session first." }
+            if destinations.isEmpty { error = "Open opeco and join a session first." }
             if destinations.count == 1 { destination = destinations[0].sessionID }
         } catch { self.error = error.localizedDescription }
     }
@@ -165,7 +165,7 @@ private struct ShareView: View {
             guard let vault, let group = vault.identity.group,
                   let session = destinations.first(where: { $0.sessionID == destination }),
                   let key = group.keys.values.max(by: { $0.timestamp < $1.timestamp }) else {
-                throw ProtocolError.invalidResponse("Open notify.guru to prepare this session before sharing.")
+                throw ProtocolError.invalidResponse("Open opeco to prepare this session before sharing.")
             }
             try await APIClient().sendFeedback(
                 session: session, identity: vault.identity, key: key, message: message,

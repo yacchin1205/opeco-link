@@ -141,7 +141,7 @@ final class AppModel: ObservableObject, AppCommandStateOwner {
         guard !isReady else { return }
 #if DEBUG
         if isRecoverableStartupFailureUITest {
-            failStartup("The saved notify.guru data on this device can no longer be opened.", canReset: true)
+            failStartup("The saved opeco data on this device can no longer be opened.", canReset: true)
             return
         }
         if isMixedSessionInheritanceUITest {
@@ -185,7 +185,7 @@ final class AppModel: ObservableObject, AppCommandStateOwner {
             await openPendingUniversalLink()
         } catch KeychainError.unsupportedVersion {
             failStartup(
-                "The saved notify.guru data on this device can no longer be opened. Erase it to set up this device again; saved sessions will be removed.",
+                "The saved opeco data on this device can no longer be opened. Erase it to set up this device again; saved sessions will be removed.",
                 canReset: true
             )
         } catch {
@@ -516,7 +516,7 @@ final class AppModel: ObservableObject, AppCommandStateOwner {
             URLQueryItem(name: "v", value: "3"), URLQueryItem(name: "r", value: request.requestID),
             URLQueryItem(name: "a", value: request.authSecret), URLQueryItem(name: "h", value: request.requestHash),
         ]
-        var result = URLComponents(string: "https://notify.guru/device")!
+        var result = URLComponents(url: ServiceOrigin.primaryURL.appendingPathComponent("device"), resolvingAgainstBaseURL: false)!
         result.percentEncodedFragment = fragment.percentEncodedQuery
         guard let value = result.url?.absoluteString else { throw ProtocolError.invalidResponse("could not create the link for adding this device") }
         return value
@@ -564,7 +564,7 @@ final class AppModel: ObservableObject, AppCommandStateOwner {
         if case PushError.badgesDisabled = error {
             guard !didReportDisabledBadges else { return }
             didReportDisabledBadges = true
-            noticeMessage = "App icon badges are turned off. To see the number of unresolved items on the Home Screen, enable Badges in Settings > Notifications > notify.guru."
+            noticeMessage = "App icon badges are turned off. To see the number of unresolved items on the Home Screen, enable Badges in Settings > Notifications > opeco."
             return
         }
         show(error)
@@ -752,7 +752,9 @@ final class AppModel: ObservableObject, AppCommandStateOwner {
             )
             try relay.addSession(session)
             var uiTestSessions = [session]
-            if ProcessInfo.processInfo.arguments.contains("-ui-test-photo-message") {
+            if ProcessInfo.processInfo.arguments.contains("-ui-test-empty-sessions") {
+                uiTestSessions = []
+            } else if ProcessInfo.processInfo.arguments.contains("-ui-test-photo-message") {
                 uiTestSessions[0].notifications = []
                 uiTestSessions[0].request = nil
                 uiTestSessions[0].requestKeyTimestamp = nil

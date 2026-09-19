@@ -707,7 +707,7 @@ func (s *Store) receiveAttachment(
 		return nil, fmt.Errorf("JPEG dimensions do not match the attachment manifest")
 	}
 	if session.tempDir == "" {
-		session.tempDir, err = os.MkdirTemp("", "notifyg-attachments-")
+		session.tempDir, err = os.MkdirTemp("", "opeco-attachments-")
 		if err != nil {
 			return nil, fmt.Errorf("create attachment temporary directory: %w", err)
 		}

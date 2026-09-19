@@ -13,8 +13,8 @@ import (
 	"syscall"
 	"time"
 
-	"notify.guru/internal/mcpserver"
-	"notify.guru/internal/notify"
+	"opeco.link/internal/mcpserver"
+	"opeco.link/internal/notify"
 )
 
 func main() {
@@ -25,9 +25,9 @@ func main() {
 }
 
 func run() (runErr error) {
-	flags := flag.NewFlagSet("notifyg", flag.ContinueOnError)
+	flags := flag.NewFlagSet("opeco", flag.ContinueOnError)
 	flags.SetOutput(os.Stderr)
-	baseURL := flags.String("base-url", "https://notify.guru", "notify.guru service URL")
+	baseURL := flags.String("base-url", "https://opeco.link", "opeco service URL")
 	title := flags.String("title", "Development session", "interactive session title")
 	color := flags.String("color", "random", "session panel color: random or #rrggbb")
 	noTerminalQR := flags.Bool("no-terminal-qr", false, "do not draw the pairing QR code in the terminal; the QR image URL and pairing URL are still printed")
@@ -35,7 +35,7 @@ func run() (runErr error) {
 		return err
 	}
 	if flags.NArg() > 1 {
-		return fmt.Errorf("usage: notifyg [--base-url URL] [--title TITLE] [--color random|#rrggbb] [--no-terminal-qr] [mcp]")
+		return fmt.Errorf("usage: opeco [--base-url URL] [--title TITLE] [--color random|#rrggbb] [--no-terminal-qr] [mcp]")
 	}
 
 	api, err := notify.NewAPI(*baseURL)
@@ -72,7 +72,7 @@ func run() (runErr error) {
 
 // isCharacterDevice reports whether output goes to a terminal. A block-character
 // QR code depends on the cell geometry of a terminal, so it is only drawn when
-// notifyg writes to one; redirected output gets the URLs alone.
+// opeco writes to one; redirected output gets the URLs alone.
 func isCharacterDevice(file *os.File) bool {
 	info, err := file.Stat()
 	if err != nil {
@@ -133,7 +133,7 @@ func interactive(ctx context.Context, store *notify.Store, viewer *notify.QRView
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	knownGroups := 0
-	fmt.Fprint(output, "notifyg> ")
+	fmt.Fprint(output, "opeco> ")
 	for {
 		select {
 		case <-ctx.Done():
@@ -145,20 +145,20 @@ func interactive(ctx context.Context, store *notify.Store, viewer *notify.QRView
 			if err != nil {
 				if notify.IsTransientAPIError(ctx, err) {
 					fmt.Fprintf(errorOutput, "\ntemporarily unable to check joined device groups: %v; will retry\n", err)
-					fmt.Fprint(output, "notifyg> ")
+					fmt.Fprint(output, "opeco> ")
 					continue
 				}
 				return fmt.Errorf("detect joined device groups: %w", err)
 			}
 			if count > knownGroups {
-				fmt.Fprintf(output, "\n%d new device group(s) joined; %d total\nnotifyg> ", count-knownGroups, count)
+				fmt.Fprintf(output, "\n%d new device group(s) joined; %d total\nopeco> ", count-knownGroups, count)
 				knownGroups = count
 			}
 			continue
 		case scanned := <-lines:
 			line := strings.TrimSpace(scanned)
 			if line == "" {
-				fmt.Fprint(output, "notifyg> ")
+				fmt.Fprint(output, "opeco> ")
 				continue
 			}
 			command, argument, _ := strings.Cut(line, " ")
@@ -169,7 +169,7 @@ func interactive(ctx context.Context, store *notify.Store, viewer *notify.QRView
 			if exit {
 				return nil
 			}
-			fmt.Fprint(output, "notifyg> ")
+			fmt.Fprint(output, "opeco> ")
 		}
 	}
 }

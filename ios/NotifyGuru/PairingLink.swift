@@ -1,6 +1,17 @@
 import CryptoKit
 import Foundation
 
+enum ServiceOrigin {
+    static let primaryHost = "opeco.link"
+    static let legacyHost = "notify.guru"
+    static let primaryURL = URL(string: "https://\(primaryHost)")!
+
+    static func accepts(host: String?) -> Bool {
+        guard let host = host?.lowercased() else { return false }
+        return host == primaryHost || host == legacyHost
+    }
+}
+
 struct PairingLink: Equatable {
     let protocolVersion: Int
     let sessionID: String
@@ -13,11 +24,11 @@ struct PairingLink: Equatable {
     init(_ value: String) throws {
         guard let components = URLComponents(string: value),
               components.scheme == "https",
-              components.host == "notify.guru",
+              ServiceOrigin.accepts(host: components.host),
               components.path == "/join",
               components.query == nil,
               let fragment = components.fragment else {
-            throw ProtocolError.invalidPairingLink("expected an https://notify.guru/join URL")
+            throw ProtocolError.invalidPairingLink("expected an https://opeco.link/join or https://notify.guru/join URL")
         }
         guard let fragmentComponents = URLComponents(string: "https://fragment.invalid/?\(fragment)"),
               let items = fragmentComponents.queryItems else {
@@ -88,13 +99,13 @@ struct DeviceRequestLink: Equatable {
     init(_ value: String) throws {
         guard let components = URLComponents(string: value),
               components.scheme == "https",
-              components.host == "notify.guru",
+              ServiceOrigin.accepts(host: components.host),
               components.path == "/device",
               components.query == nil,
               let fragment = components.fragment,
               let parsed = URLComponents(string: "https://fragment.invalid/?\(fragment)"),
               let items = parsed.queryItems else {
-            throw ProtocolError.invalidPairingLink("expected an https://notify.guru/device URL")
+            throw ProtocolError.invalidPairingLink("expected an https://opeco.link/device or https://notify.guru/device URL")
         }
         let expected = Set(["v", "r", "a", "h"])
         guard items.count == expected.count, Set(items.map(\.name)) == expected else {

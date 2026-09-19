@@ -8,6 +8,7 @@
 	<string>$(APS_ENVIRONMENT)</string>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
+		<string>applinks:opeco.link</string>
 		<string>applinks:notify.guru</string>
 	</array>
 	<key>com.apple.security.app-sandbox</key>

@@ -110,6 +110,23 @@ describe("session relay", () => {
       },
     });
   });
+
+  it("serves the opeco PWA identity and every iOS-derived icon preset", async () => {
+    const page = await SELF.fetch("https://opeco.link/");
+    expect(await page.text()).toContain('<link rel="icon" href="/favicon.svg" type="image/svg+xml">');
+    const favicon = await SELF.fetch("https://opeco.link/favicon.svg");
+    expect(favicon.status).toBe(200);
+    expect(favicon.headers.get("content-type")).toContain("image/svg+xml");
+    expect(await favicon.text()).toContain('clip-path="url(#favicon-rounded-mask)"');
+    const manifest = await SELF.fetch("https://opeco.link/manifest.webmanifest");
+    expect(await manifest.json()).toMatchObject({ name: "opeco", short_name: "opeco" });
+    for (const name of ["outline", "blue", "cyan", "green", "orange", "red", "yellow", "purple", "pink"]) {
+      const icon = await SELF.fetch(`https://opeco.link/opeco/${name}.svg`);
+      expect(icon.status).toBe(200);
+      expect(icon.headers.get("content-type")).toContain("image/svg+xml");
+      expect(await icon.text()).toContain("<svg");
+    }
+  });
 });
 
 async function createSession(): Promise<{ id: string; sessionToken: string }> {

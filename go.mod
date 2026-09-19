@@ -1,4 +1,4 @@
-module notify.guru
+module opeco.link
 
 go 1.26.6
 

@@ -32,7 +32,12 @@ struct NotifyGuruMacApp: App {
         Window("Sessions", id: "sessions") {
             MacMenuBarView()
                 .environmentObject(model)
+                .handlesExternalEvents(
+                    preferring: ["opecolink://sessions", "notifyguru://sessions"],
+                    allowing: ["opecolink://sessions", "notifyguru://sessions"]
+                )
         }
+        .handlesExternalEvents(matching: ["opecolink://sessions", "notifyguru://sessions"])
         .defaultSize(width: 420, height: 620)
 
         Window("Add Device", id: "device-addition-approval") {
@@ -52,8 +57,15 @@ private struct MacMenuBarLabel: View {
         let unresolvedCount = model.sessions.unresolvedCount
         let hasSyncError = model.connectionState == .failed
         HStack(spacing: 3) {
-            Image(systemName: hasSyncError ? "exclamationmark.triangle.fill" : unresolvedCount == 0 ? "bell" : "bell.badge.fill")
-                .id(hasSyncError ? "sync-error-icon" : "notification-icon")
+            Image("OpecoMenuBar")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 18, height: 18)
+                .id("opeco-menu-bar-icon")
+            if hasSyncError {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .id("sync-error-icon")
+            }
             if unresolvedCount > 0 {
                 Text("\(unresolvedCount)")
                     .monospacedDigit()
@@ -62,10 +74,10 @@ private struct MacMenuBarLabel: View {
             .id(hasSyncError ? "sync-error-label" : "notification-label-\(unresolvedCount)")
             .accessibilityLabel(
                 hasSyncError
-                    ? "notify.guru, sync error"
+                    ? "opeco, sync error"
                     : unresolvedCount == 0
-                    ? "notify.guru, no unresolved items"
-                    : "notify.guru, \(unresolvedCount) unresolved \(unresolvedCount == 1 ? "item" : "items")"
+                    ? "opeco, no unresolved items"
+                    : "opeco, \(unresolvedCount) unresolved \(unresolvedCount == 1 ? "item" : "items")"
             )
             .onChange(of: model.isDeviceAdditionApprovalPending) { _, pending in
                 if pending { presentDeviceAdditionApproval() }
@@ -170,9 +182,9 @@ final class MacRuntime: ObservableObject {
 
     func open(_ url: URL) {
         start()
-        if url.scheme == "notifyguru" {
+        if url.scheme == "opecolink" || url.scheme == "notifyguru" {
             guard url.host == "sessions", url.path.isEmpty else {
-                model.reportError("This notify.guru link cannot be opened.")
+                model.reportError("This opeco link cannot be opened.")
                 return
             }
             sessionsWindowRequest += 1

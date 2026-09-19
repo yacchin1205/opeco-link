@@ -59,7 +59,7 @@ export async function resetLocalData() {
     const deletion = indexedDB.deleteDatabase(DB_NAME);
     deletion.onsuccess = () => resolve();
     deletion.onerror = () => reject(deletion.error ?? new Error("ブラウザ内データを削除できませんでした"));
-    deletion.onblocked = () => reject(new Error("別のタブでnotify.guruが開かれています。ほかのタブを閉じて再試行してください。"));
+    deletion.onblocked = () => reject(new Error("別のタブでopecoが開かれています。ほかのタブを閉じて再試行してください。"));
   });
 }
 

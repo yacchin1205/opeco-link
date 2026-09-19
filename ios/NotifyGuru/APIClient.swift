@@ -21,7 +21,7 @@ enum DeviceRequestStatus: Equatable {
 }
 
 struct APIClient {
-    private let baseURL = URL(string: "https://notify.guru")!
+    private let baseURL = ServiceOrigin.primaryURL
     private let maximumResponseBytes = 2 * 1024 * 1024
     private let session: URLSession
 
@@ -453,7 +453,7 @@ struct APIClient {
 
 struct APIError: LocalizedError, Equatable {
     let status: Int; let code: String; let message: String
-    var errorDescription: String? { "notify.guru API: \(code) (\(status)): \(message)" }
+    var errorDescription: String? { "opeco API: \(code) (\(status)): \(message)" }
 }
 
 private struct GroupTransitionRequest: Encodable {

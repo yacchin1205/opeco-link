@@ -1,11 +1,11 @@
 version: 2
 
-project_name: notifyg
+project_name: opeco
 
 builds:
-  - id: notifyg
-    main: ./cmd/notifyg
-    binary: notifyg
+  - id: opeco
+    main: ./cmd/opeco
+    binary: opeco
     env:
       - CGO_ENABLED=0
     flags:

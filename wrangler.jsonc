@@ -11,6 +11,10 @@
     {
       "pattern": "notify.guru",
       "custom_domain": true
+    },
+    {
+      "pattern": "opeco.link",
+      "custom_domain": true
     }
   ],
   "assets": {

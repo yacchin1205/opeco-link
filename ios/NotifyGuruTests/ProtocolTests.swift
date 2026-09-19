@@ -52,9 +52,10 @@ final class ProtocolTests: XCTestCase {
         XCTAssertEqual(link.protocolVersion, 3)
         XCTAssertEqual(link.color, "#ffd6e0")
         XCTAssertEqual(
-            try PairingLink("https://notify.guru/join#v=4&s=session_identifier&p=pairing_identifier&t=\(token)&a=\(secret)&k=\(publicKey)&c=ffd6e0").protocolVersion,
+            try PairingLink("https://opeco.link/join#v=4&s=session_identifier&p=pairing_identifier&t=\(token)&a=\(secret)&k=\(publicKey)&c=ffd6e0").protocolVersion,
             4
         )
+        XCTAssertThrowsError(try PairingLink("https://example.com/join#v=4&s=session_identifier&p=pairing_identifier&t=\(token)&a=\(secret)&k=\(publicKey)&c=ffd6e0"))
         XCTAssertThrowsError(try PairingLink("https://notify.guru/join#v=2&s=session_identifier&p=pairing_identifier&t=\(token)&a=\(secret)&k=\(publicKey)&c=ffd6e0"))
         let invalidCurvePoint = Base64URL.encode(Data(repeating: 0, count: 65))
         XCTAssertThrowsError(try PairingLink("https://notify.guru/join#v=4&s=session_identifier&p=pairing_identifier&t=\(token)&a=\(secret)&k=\(invalidCurvePoint)&c=ffd6e0"))
@@ -67,6 +68,10 @@ final class ProtocolTests: XCTestCase {
         XCTAssertEqual(link.requestID, "request_identifier")
         XCTAssertEqual(link.authSecret, secret)
         XCTAssertEqual(link.requestHash, requestHash)
+        XCTAssertEqual(
+            try DeviceRequestLink("https://opeco.link/device#v=3&r=request_identifier&a=\(secret)&h=\(requestHash)").requestID,
+            "request_identifier"
+        )
         XCTAssertThrowsError(try DeviceRequestLink("https://notify.guru/device#v=3&r=request_identifier&a=\(secret)&h=\(requestHash)&g=group"))
     }
 
@@ -689,6 +694,29 @@ final class ProtocolTests: XCTestCase {
     func testDeviceRequestQRCodeGeneration() {
         XCTAssertNotNil(InvitationQRCode.image(for: "https://notify.guru/device#v=2&r=request"))
         XCTAssertNil(InvitationQRCode.image(for: ""))
+    }
+
+    func testOpecoPaletteFollowsSessionColorHue() {
+        let expectations: [(String, OpecoSessionPalette)] = [
+            ("#0000ff", .blue),
+            ("#00ffff", .cyan),
+            ("#00ff00", .green),
+            ("#ffff00", .yellow),
+            ("#ffa500", .orange),
+            ("#ff0000", .red),
+            ("#ff69b4", .pink),
+            ("#800080", .purple),
+        ]
+
+        for (color, expected) in expectations {
+            XCTAssertEqual(OpecoSessionPalette.nearest(toHex: color), expected, color)
+        }
+    }
+
+    func testOpecoPaletteUsesBlueForMissingInvalidOrNeutralColors() {
+        XCTAssertEqual(OpecoSessionPalette.nearest(toHex: nil), .blue)
+        XCTAssertEqual(OpecoSessionPalette.nearest(toHex: "not-a-color"), .blue)
+        XCTAssertEqual(OpecoSessionPalette.nearest(toHex: "#808080"), .blue)
     }
 
     private func fixedIdentity() throws -> DeviceIdentity {

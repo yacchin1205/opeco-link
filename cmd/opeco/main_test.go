@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"notify.guru/internal/notify"
+	"opeco.link/internal/notify"
 )
 
 func TestWriteResponseIdentifiesTrackedDismissTarget(t *testing.T) {
@@ -46,10 +46,10 @@ func TestWriteResponseIncludesDecryptedAttachmentPath(t *testing.T) {
 	writeResponse(&output, notify.Response{
 		Type:        "feedback",
 		GroupID:     "group",
-		Attachments: []*notify.ReceivedAttachment{{Path: "/tmp/notifyg-attachments/example.jpg"}},
+		Attachments: []*notify.ReceivedAttachment{{Path: "/tmp/opeco-attachments/example.jpg"}},
 		CreatedAt:   time.Date(2026, 9, 3, 11, 38, 38, 0, time.UTC),
 	})
-	if got, want := output.String(), "feedback message=\"\" attachment[1]=/tmp/notifyg-attachments/example.jpg group=group at=2026-09-03T11:38:38Z\n"; got != want {
+	if got, want := output.String(), "feedback message=\"\" attachment[1]=/tmp/opeco-attachments/example.jpg group=group at=2026-09-03T11:38:38Z\n"; got != want {
 		t.Fatalf("output = %q, want %q", got, want)
 	}
 }

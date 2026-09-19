@@ -65,6 +65,7 @@
 		BB1000000000000000000002 /* WidgetSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00000000000000000000017 /* WidgetSnapshotStore.swift */; };
 		BB1000000000000000000003 /* NotifyGuruMacWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC1000000000000000000001 /* NotifyGuruMacWidget.swift */; };
 		BB1000000000000000000004 /* NotifyGuruMacWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = BC1000000000000000000004 /* NotifyGuruMacWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		BB1000000000000000000005 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AC100000000000000000000C /* Assets.xcassets */; };
 		2350AE03AFB0EB0E47E37849 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = C00000000000000000000009 /* Models.swift */; };
 		29C874373E444B011819572F /* PhotoPreparer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2861FF8F1A1343273301A1C7 /* PhotoPreparer.swift */; };
 		2C6E9B3F00BDDCE3C84C0E94 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B05C857DB6BA3551D0B259C0 /* ShareViewController.swift */; };
@@ -663,6 +664,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BB1000000000000000000005 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

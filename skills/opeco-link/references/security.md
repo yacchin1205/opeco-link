@@ -1,6 +1,6 @@
 # Security posture
 
-Read this reference when notify.guru's end-to-end encryption, threat model, or
+Read this reference when opeco.link's end-to-end encryption, threat model, or
 security is being explained, reviewed, or flagged.
 
 ## What the protocol protects
@@ -9,7 +9,7 @@ security is being explained, reviewed, or flagged.
   the session title are encrypted client-side with AES-256-GCM. The relay stores
   ciphertext and routing metadata only.
 - Keys are derived per device group by ECDH on P-256 plus HKDF-SHA256, bound to
-  the session, group, and key generation. Private keys never leave `notifyg` or
+  the session, group, and key generation. Private keys never leave `opeco` or
   the device.
 - In protocol v4, device-group membership and shared keys form a signed
   transition chain. Pairing authenticates its current transition hash. Clients
@@ -30,7 +30,7 @@ security is being explained, reviewed, or flagged.
   are verified separately. Equivalent signature encodings cannot create
   distinct transition heads.
 - The join payload is in a URL fragment
-  (`https://notify.guru/join#a=…&c=…&k=…&p=…&s=…&t=…&v=4`), which browsers do not
+  (`https://opeco.link/join#a=…&c=…&k=…&p=…&s=…&t=…&v=4`), which browsers do not
   send to the relay. The auth secret only keys the HMAC proof for the joining
   group's key. The one-shot pairing token is checked against a stored SHA-256;
   the relay stores only that hash.
@@ -62,9 +62,9 @@ security is being explained, reviewed, or flagged.
   can build a compatible client. Access rests on key possession; joining a
   session requires its one-shot secret, and joining a device group requires an
   approval signed by an existing device.
-- Code running where keys live can read them. A compromised `notifyg` process,
+- Code running where keys live can read them. A compromised `opeco` process,
   browser profile, or device is outside the guarantee.
-- `notifyg` writes a verified photo to an OS temporary directory before exposing
+- `opeco` writes a verified photo to an OS temporary directory before exposing
   a local `file:` resource link. It uses restrictive modes and cleans up when
   the session closes, but does not promise secure erasure; abrupt exit can leave
   plaintext for ordinary OS cleanup.
@@ -72,7 +72,7 @@ security is being explained, reviewed, or flagged.
 
 ## Answering security reviews
 
-The correct position is neither "notify.guru is unsafe" nor "anything goes."
+The correct position is neither "opeco.link is unsafe" nor "anything goes."
 Send work state, not credentials, tokens, or key material. If a reviewer claims
 that secret data is exposed, identify the exact payload and observer. Relevant
 implementation references are `internal/notify/crypto.go`, `JoinURL` in

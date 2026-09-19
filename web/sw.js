@@ -1,5 +1,8 @@
-const CACHE_NAME = "notify-guru-shell-v16";
-const SHELL = ["/", "/styles.css", "/app.js", "/icon.svg", "/icon-192.png", "/icon-512.png"];
+const CACHE_NAME = "opeco-shell-v19";
+const SHELL = [
+  "/", "/styles.css", "/app.js", "/manifest.webmanifest", "/icon.svg", "/favicon.svg", "/icon-192.png", "/icon-512.png",
+  ...["outline", "blue", "cyan", "green", "orange", "red", "yellow", "purple", "pink"].map((name) => `/opeco/${name}.svg`),
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()));

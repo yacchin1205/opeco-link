@@ -21,14 +21,42 @@ struct MacMenuBarView: View {
 
     private var header: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("notify.guru")
-                    .font(.headline)
-                Text(model.connectionState.label)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            Label(model.connectionState.label, systemImage: connectionSymbol)
+                .font(.caption)
+                .foregroundStyle(.secondary)
             Spacer()
+            Button {
+                openWindow(id: "device-group")
+                dismiss()
+            } label: {
+                Image(systemName: "macbook.and.iphone")
+                    .font(.system(size: 15, weight: .medium))
+                    .symbolRenderingMode(.monochrome)
+                    .frame(width: 24, height: 24)
+                    .overlay(alignment: .topTrailing) {
+                        if model.deviceCount > 1 {
+                            Text("\(model.deviceCount)")
+                                .font(.system(size: 8, weight: .bold, design: .rounded).monospacedDigit())
+                                .foregroundStyle(.white)
+                                .frame(width: 13, height: 13)
+                                .background(Color(red: 0.42, green: 0.42, blue: 0.45), in: Capsule())
+                                .offset(x: 5, y: -5)
+                                .accessibilityHidden(true)
+                        }
+                    }
+            }
+            .buttonStyle(.plain)
+            .disabled(!model.isReady)
+            .accessibilityLabel("Manage group")
+            .accessibilityValue(model.deviceCount > 1 ? "\(model.deviceCount) devices" : "1 device")
+
+            Button("Add Session", systemImage: "plus") {
+                openWindow(id: "join-session")
+            }
+            .labelStyle(.iconOnly)
+            .buttonStyle(.plain)
+            .disabled(!model.isReady)
+
             Button("Refresh", systemImage: "arrow.clockwise") {
                 Task { await model.sync() }
             }
@@ -61,9 +89,19 @@ struct MacMenuBarView: View {
                     }
                     if model.sessions.isEmpty {
                         ContentUnavailableView {
-                            Label("No sessions", systemImage: "link.badge.plus")
+                            VStack(spacing: 6) {
+                                Image("OpecoEmpty")
+                                    .resizable()
+                                    .renderingMode(.template)
+                                    .scaledToFit()
+                                    .foregroundStyle(Color(red: 0.533, green: 0.533, blue: 0.533))
+                                    .frame(height: 96)
+                                    .accessibilityLabel("opeco")
+                                    .accessibilityIdentifier("opeco-empty-outline")
+                                Text("No sessions")
+                            }
                         } description: {
-                            Text("Open or paste a one-shot notify.guru link.")
+                            Text("Open or paste a one-shot link shown by opeco.")
                         } actions: {
                             Button("Add Session") { openWindow(id: "join-session") }
                                 .buttonStyle(.borderedProminent)
@@ -79,18 +117,20 @@ struct MacMenuBarView: View {
 
     private var footer: some View {
         HStack {
-            Button("Add Session") { openWindow(id: "join-session") }
-                .disabled(!model.isReady)
-            Button("Device Group") {
-                openWindow(id: "device-group")
-                dismiss()
-            }
-                .disabled(!model.isReady)
             Spacer()
             Button("Quit") { NSApplication.shared.terminate(nil) }
         }
         .buttonStyle(.plain)
         .padding(14)
+    }
+
+    private var connectionSymbol: String {
+        switch model.connectionState {
+        case .preparing: "circle.dotted"
+        case .syncing: "arrow.triangle.2.circlepath"
+        case .current: "checkmark.circle"
+        case .failed: "exclamationmark.triangle"
+        }
     }
 }
 
@@ -159,6 +199,7 @@ private struct MacNoticeBanner: View {
 private struct MacSessionCard: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.colorScheme) private var colorScheme
+    @ScaledMetric(relativeTo: .caption) private var opecoSize = 18.0
     let session: SessionRecord
     @State private var responding = false
     @State private var composingMessage = false
@@ -174,7 +215,27 @@ private struct MacSessionCard: View {
     @FocusState private var messageFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        HStack(alignment: .top, spacing: opecoSize * 0.2) {
+            Image(opecoPalette.assetName)
+                .resizable()
+                .scaledToFit()
+                .frame(width: opecoSize * 2.5, height: opecoSize * 2.5)
+                .padding(.top, 12)
+                .accessibilityLabel("opeco")
+                .accessibilityIdentifier("session-opeco")
+                .accessibilityValue(opecoPalette.rawValue)
+                .accessibilityHint(session.attention ? "Long press to stop watching status updates" : "Long press to watch status updates")
+                .accessibilityAction(named: session.attention ? "Stop Watching Status Updates" : "Watch Status Updates") {
+                    toggleAttention()
+                }
+                .onLongPressGesture { toggleAttention() }
+                .contextMenu {
+                    Button(session.attention ? "Stop Watching Status Updates" : "Watch Status Updates") {
+                        toggleAttention()
+                    }
+                }
+
+            VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 Text(session.title)
                     .font(.headline)
@@ -349,15 +410,22 @@ private struct MacSessionCard: View {
                         .accessibilityLabel("Send a Message")
                 }
             }
+            }
+            .padding(.vertical, 14)
+            .padding(.trailing, 14)
+            .padding(.leading, 24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                panelColor.opacity(colorScheme == .dark ? 0.35 : 0.72),
+                in: MacSessionBubbleShape(tailY: 12 + opecoSize * 1.25)
+            )
+            .overlay {
+                MacSessionBubbleShape(tailY: 12 + opecoSize * 1.25)
+                    .stroke(session.attention ? Color.notifyGuruAccent : Color.primary.opacity(0.08), lineWidth: session.attention ? 2 : 1)
+            }
+            .shadow(color: session.attention ? Color.notifyGuruAccent.opacity(0.55) : .clear, radius: 12)
         }
-        .padding(14)
-        .background(panelColor.opacity(colorScheme == .dark ? 0.35 : 0.72), in: RoundedRectangle(cornerRadius: 14))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(session.attention ? Color.notifyGuruAccent : Color.primary.opacity(0.08), lineWidth: session.attention ? 2 : 1)
-        }
-        .shadow(color: session.attention ? Color.notifyGuruAccent.opacity(0.55) : .clear, radius: 12)
-        .onLongPressGesture { toggleAttention() }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .sheet(isPresented: Binding(get: { previewPhoto != nil }, set: { if !$0 { previewPhoto = nil } })) {
             VStack {
                 if let photo = previewPhoto, let image = NSImage(data: photo.jpeg) {
@@ -365,9 +433,6 @@ private struct MacSessionCard: View {
                 }
                 Button("Close") { previewPhoto = nil }
             }.padding().frame(width: 600, height: 480)
-        }
-        .contextMenu {
-            Button(session.attention ? "Stop Watching Status Updates" : "Watch Status Updates") { toggleAttention() }
         }
     }
 
@@ -460,10 +525,97 @@ private struct MacSessionCard: View {
         session.color.flatMap(Color.init(hex:)) ?? Color(nsColor: .controlBackgroundColor)
     }
 
+    private var opecoPalette: MacOpecoSessionPalette {
+        .nearest(toHex: session.color)
+    }
+
     private var expiryLabel: String {
         let remaining = Double(session.expiresAt) / 1_000 - Date().timeIntervalSince1970
         guard remaining > 0 else { return "Checking expiry" }
         return "~\(max(1, Int(ceil(remaining / 3_600))))h"
+    }
+}
+
+private struct MacSessionBubbleShape: Shape {
+    let tailY: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let tailWidth = 10.0
+        let tailHalfHeight = 8.0
+        let resolvedTailY = min(tailY, rect.height / 2)
+        let body = CGRect(x: tailWidth, y: 0, width: max(0, rect.width - tailWidth), height: rect.height)
+        let corner = min(16.0, body.width / 2, body.height / 2)
+
+        var path = Path()
+        path.move(to: CGPoint(x: body.minX + corner, y: body.minY))
+        path.addLine(to: CGPoint(x: body.maxX - corner, y: body.minY))
+        path.addQuadCurve(to: CGPoint(x: body.maxX, y: body.minY + corner), control: CGPoint(x: body.maxX, y: body.minY))
+        path.addLine(to: CGPoint(x: body.maxX, y: body.maxY - corner))
+        path.addQuadCurve(to: CGPoint(x: body.maxX - corner, y: body.maxY), control: CGPoint(x: body.maxX, y: body.maxY))
+        path.addLine(to: CGPoint(x: body.minX + corner, y: body.maxY))
+        path.addQuadCurve(to: CGPoint(x: body.minX, y: body.maxY - corner), control: CGPoint(x: body.minX, y: body.maxY))
+        path.addLine(to: CGPoint(x: body.minX, y: resolvedTailY + tailHalfHeight))
+        path.addLine(to: CGPoint(x: rect.minX, y: resolvedTailY))
+        path.addLine(to: CGPoint(x: body.minX, y: resolvedTailY - tailHalfHeight))
+        path.addLine(to: CGPoint(x: body.minX, y: body.minY + corner))
+        path.addQuadCurve(to: CGPoint(x: body.minX + corner, y: body.minY), control: CGPoint(x: body.minX, y: body.minY))
+        path.closeSubpath()
+        return path
+    }
+}
+
+private enum MacOpecoSessionPalette: String, CaseIterable {
+    case red, orange, yellow, green, cyan, blue, purple, pink
+
+    var assetName: String {
+        self == .blue ? "OpecoSession" : "OpecoSession\(rawValue.capitalized)"
+    }
+
+    static func nearest(toHex color: String?) -> Self {
+        guard let color,
+              color.range(of: #"^#[0-9a-fA-F]{6}$"#, options: .regularExpression) != nil,
+              let value = UInt64(color.dropFirst(), radix: 16) else { return .blue }
+
+        let red = CGFloat((value >> 16) & 0xff) / 255
+        let green = CGFloat((value >> 8) & 0xff) / 255
+        let blue = CGFloat(value & 0xff) / 255
+        let maximum = max(red, green, blue)
+        let minimum = min(red, green, blue)
+        let delta = maximum - minimum
+        guard maximum > 0, delta / maximum >= 0.08 else { return .blue }
+
+        let hue: CGFloat
+        if delta == 0 {
+            hue = 0
+        } else if maximum == red {
+            hue = ((green - blue) / delta).truncatingRemainder(dividingBy: 6) / 6
+        } else if maximum == green {
+            hue = ((blue - red) / delta + 2) / 6
+        } else {
+            hue = ((red - green) / delta + 4) / 6
+        }
+        let normalizedHue = hue < 0 ? hue + 1 : hue
+        return allCases.min {
+            circularDistance(from: normalizedHue, to: $0.hue) < circularDistance(from: normalizedHue, to: $1.hue)
+        } ?? .blue
+    }
+
+    private var hue: CGFloat {
+        switch self {
+        case .red: 0 / 360
+        case .orange: 30 / 360
+        case .yellow: 55 / 360
+        case .green: 120 / 360
+        case .cyan: 185 / 360
+        case .blue: 220 / 360
+        case .purple: 285 / 360
+        case .pink: 330 / 360
+        }
+    }
+
+    private static func circularDistance(from lhs: CGFloat, to rhs: CGFloat) -> CGFloat {
+        let distance = abs(lhs - rhs)
+        return min(distance, 1 - distance)
     }
 }
 

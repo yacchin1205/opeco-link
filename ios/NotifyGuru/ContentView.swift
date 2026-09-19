@@ -29,17 +29,26 @@ struct ContentView: View {
 #endif
                                 if model.isAwaitingDeviceApproval {
                                     DeviceApprovalWaitingCard()
-                                } else {
-                                    DeviceSummaryCard(showingManagement: $showingDeviceManagement)
                                 }
                                 if model.sessions.isEmpty {
                                     ContentUnavailableView {
-                                        Label("No sessions", systemImage: "link.badge.plus")
+                                        VStack(spacing: 8) {
+                                            Image("OpecoEmpty")
+                                                .resizable()
+                                                .renderingMode(.template)
+                                                .scaledToFit()
+                                                .foregroundStyle(Color(red: 0.533, green: 0.533, blue: 0.533))
+                                                .frame(height: 128)
+                                                .accessibilityLabel("opeco")
+                                                .accessibilityIdentifier("opeco-empty-outline")
+                                            Text("No sessions")
+                                        }
                                     } description: {
-                                        Text("Scan the one-shot QR code shown by notifyg.")
+                                        Text("Scan the one-shot QR code shown by opeco.")
                                     } actions: {
                                         Button("Scan QR code") { showingJoin = true }
                                             .buttonStyle(.borderedProminent)
+                                            .accessibilityIdentifier("empty-scan-qr-code")
                                     }
                                 } else {
                                     LazyVGrid(columns: sessionColumns(for: geometry.size), alignment: .leading, spacing: 16) {
@@ -56,13 +65,42 @@ struct ContentView: View {
                 }
             }
             .background(Color.brandBackground.ignoresSafeArea())
-            .navigationTitle(model.isReady ? "notify.guru" : "")
             .toolbar(model.isReady ? .visible : .hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Label(model.connectionState.label, systemImage: connectionSymbol)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingDeviceManagement = true
+                    } label: {
+                        Image(systemName: "macbook.and.iphone")
+                            .font(.system(size: 18, weight: .medium))
+                            .symbolRenderingMode(.monochrome)
+                            .foregroundStyle(Color(red: 0.22, green: 0.70, blue: 0.92))
+                            .opacity(1)
+                            .frame(width: 24, height: 24)
+                            .overlay(alignment: .topTrailing) {
+                                if model.deviceCount > 1 {
+                                    Text("\(model.deviceCount)")
+                                        .font(.system(size: 9, weight: .bold, design: .rounded).monospacedDigit())
+                                        .foregroundStyle(Color.white)
+                                        .frame(width: 14, height: 14)
+                                        .background(Color(red: 0.42, green: 0.42, blue: 0.45), in: Capsule())
+                                        .opacity(1)
+                                        .offset(x: 5, y: -5)
+                                        .accessibilityHidden(true)
+                                }
+                            }
+                    }
+                    .buttonBorderShape(.circle)
+                    .accessibilityLabel("Manage group")
+                    .accessibilityValue(model.deviceCount > 1 ? "\(model.deviceCount) devices" : "1 device")
+                }
+                if #available(iOS 26.0, *) {
+                    ToolbarSpacer(.fixed, placement: .topBarTrailing)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Scan QR code", systemImage: "qrcode.viewfinder") { showingJoin = true }
@@ -75,10 +113,9 @@ struct ContentView: View {
             .sheet(isPresented: $showingDeviceManagement) {
                 DeviceManagementView(isPresented: $showingDeviceManagement)
             }
-            .confirmationDialog(
+            .alert(
                 "Add a device to this group?",
-                isPresented: deviceAdditionApprovalPresented,
-                titleVisibility: .visible
+                isPresented: deviceAdditionApprovalPresented
             ) {
                 Button("Add device") { model.confirmDeviceAddition() }
                 Button("Cancel", role: .cancel) { model.cancelDeviceAddition() }
@@ -86,7 +123,7 @@ struct ContentView: View {
                 Text("The new device will receive notifications and can respond as a member of this device group.")
             }
             .safeAreaInset(edge: .bottom) { OperationErrorView() }
-            .alert("notify.guru", isPresented: noticePresented) {
+            .alert("opeco", isPresented: noticePresented) {
                 Button("OK") { model.dismissNotice() }
             } message: {
                 Text(model.noticeMessage ?? "")
@@ -151,7 +188,7 @@ struct OperationErrorView: View {
     var body: some View {
         if let message = model.errorMessage {
             VStack(alignment: .leading, spacing: 8) {
-                Label("notify.guru error", systemImage: "exclamationmark.triangle")
+                Label("opeco error", systemImage: "exclamationmark.triangle")
                     .font(.headline)
                 ScrollView {
                     Text(message)
@@ -174,7 +211,7 @@ private struct StartupView: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            Text("notify.guru")
+            Text("opeco")
                 .font(.largeTitle.weight(.semibold))
                 .accessibilityIdentifier("startup-title")
             ProgressView()
@@ -210,30 +247,6 @@ private struct StartupErrorView: View {
                 .buttonStyle(.bordered)
             }
         }
-    }
-}
-
-private struct DeviceSummaryCard: View {
-    @EnvironmentObject private var model: AppModel
-    @Binding var showingManagement: Bool
-
-    var body: some View {
-        HStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("DEVICE GROUP")
-                    .font(.caption2.weight(.bold))
-                    .tracking(1.5)
-                    .foregroundStyle(Color.brandAccent)
-                Text(model.isSharingAcrossDevices ? "\(model.deviceCount) devices in this group" : "Not shared")
-                    .font(.headline)
-            }
-            Spacer()
-            Button("Manage group") { showingManagement = true }
-                .buttonStyle(.bordered)
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.background, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 }
 
@@ -273,15 +286,16 @@ private struct DeviceManagementView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    requestSection
-                    Divider()
                     deviceSection
+                    Divider()
+                    requestSection
                     if model.isSharingAcrossDevices {
                         Divider()
                         Button("Remove this device from the group", role: .destructive) {
                             showingLeaveConfirmation = true
                         }
                         .buttonStyle(.bordered)
+                        .tint(.red)
                     }
                 }
                 .padding()
@@ -292,7 +306,9 @@ private struct DeviceManagementView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { isPresented = false }
+                    Button("Close", systemImage: "xmark") { isPresented = false }
+                        .labelStyle(.iconOnly)
+                        .buttonBorderShape(.circle)
                 }
             }
         }
@@ -359,7 +375,7 @@ private struct DeviceManagementView: View {
                 InvitationQRCodeView(value: link)
                 ShareLink(item: link) { Label("Share link", systemImage: "square.and.arrow.up") }
             } else {
-                Text("Create a QR code, then scan it with a device already in the group.")
+                Text("Add this device to the same group as a device you already use.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Button("Add this device to another group") {
@@ -388,8 +404,12 @@ private struct DeviceManagementView: View {
                     }
                     Spacer()
                     if device.deviceID != model.deviceID {
-                        Button("Remove", role: .destructive) { removalTarget = device }
-                            .buttonStyle(.bordered)
+                        Button(role: .destructive) { removalTarget = device } label: {
+                            Label("Remove", systemImage: "trash")
+                                .labelStyle(.iconOnly)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.red)
                     }
                 }
             }
@@ -443,9 +463,67 @@ enum InvitationQRCode {
     }
 }
 
+enum OpecoSessionPalette: String, CaseIterable {
+    case red
+    case orange
+    case yellow
+    case green
+    case cyan
+    case blue
+    case purple
+    case pink
+
+    var assetName: String {
+        switch self {
+        case .blue: "OpecoSession"
+        default: "OpecoSession\(rawValue.capitalized)"
+        }
+    }
+
+    static func nearest(toHex color: String?) -> Self {
+        guard let color,
+              color.range(of: #"^#[0-9a-fA-F]{6}$"#, options: .regularExpression) != nil,
+              let value = UInt64(color.dropFirst(), radix: 16) else { return .blue }
+
+        let uiColor = UIColor(
+            red: CGFloat((value >> 16) & 0xff) / 255,
+            green: CGFloat((value >> 8) & 0xff) / 255,
+            blue: CGFloat(value & 0xff) / 255,
+            alpha: 1
+        )
+        var hue = CGFloat.zero
+        var saturation = CGFloat.zero
+        guard uiColor.getHue(&hue, saturation: &saturation, brightness: nil, alpha: nil),
+              saturation >= 0.08 else { return .blue }
+
+        return allCases.min {
+            circularDistance(from: hue, to: $0.hue) < circularDistance(from: hue, to: $1.hue)
+        } ?? .blue
+    }
+
+    private var hue: CGFloat {
+        switch self {
+        case .red: 0 / 360
+        case .orange: 30 / 360
+        case .yellow: 55 / 360
+        case .green: 120 / 360
+        case .cyan: 185 / 360
+        case .blue: 220 / 360
+        case .purple: 285 / 360
+        case .pink: 330 / 360
+        }
+    }
+
+    private static func circularDistance(from lhs: CGFloat, to rhs: CGFloat) -> CGFloat {
+        let distance = abs(lhs - rhs)
+        return min(distance, 1 - distance)
+    }
+}
+
 private struct SessionCard: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.colorScheme) private var colorScheme
+    @ScaledMetric(relativeTo: .caption) private var opecoSize = 18.0
     let session: SessionRecord
     @State private var responding = false
     @State private var showingFeedback = false
@@ -453,14 +531,26 @@ private struct SessionCard: View {
     @State private var attentionChanges = 0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 3) {
+        HStack(alignment: .top, spacing: opecoSize * 0.2) {
+            Image(opecoPalette.assetName)
+                .resizable()
+                .scaledToFit()
+                .frame(width: opecoSize * 2.5, height: opecoSize * 2.5)
+                .padding(.top, 15)
+                .accessibilityLabel("opeco")
+                .accessibilityIdentifier("session-opeco")
+                .accessibilityValue(opecoPalette.rawValue)
+                .accessibilityHint(session.attention ? "Long press to stop watching status updates" : "Long press to watch status updates")
+                .accessibilityAction(named: session.attention ? "Stop watching status updates" : "Watch status updates") {
+                    toggleAttention()
+                }
+                .onLongPressGesture { toggleAttention() }
+
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .firstTextBaseline) {
                     HStack(spacing: 6) {
-                        Text("SESSION")
-                            .font(.caption2.weight(.bold))
-                            .tracking(1.5)
-                            .foregroundStyle(Color.brandAccent)
+                        Text(session.title)
+                            .font(.title3.weight(.semibold))
                         if session.attention {
                             Image(systemName: "eye.fill")
                                 .font(.caption2)
@@ -468,123 +558,123 @@ private struct SessionCard: View {
                                 .accessibilityLabel("Watching status updates")
                         }
                     }
-                    Text(session.title)
-                        .font(.title3.weight(.semibold))
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 3) {
-                    if session.unresolvedCount > 0 {
-                        Text("\(session.unresolvedCount)")
-                            .font(.caption2.bold().monospacedDigit())
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(Color.brandAccent, in: Capsule())
-                            .accessibilityLabel(session.unresolvedAccessibilityLabel)
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 3) {
+                        if session.unresolvedCount > 0 {
+                            Text("\(session.unresolvedCount)")
+                                .font(.caption2.bold().monospacedDigit())
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(Color.brandAccent, in: Capsule())
+                                .accessibilityLabel(session.unresolvedAccessibilityLabel)
+                        }
+                        if let updatedAt = session.updatedAt {
+                            RelativeTimeText(timestampMilliseconds: updatedAt)
+                        }
+                        Text(expiryLabel)
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
                     }
-                    if let updatedAt = session.updatedAt {
-                        RelativeTimeText(timestampMilliseconds: updatedAt)
-                    }
-                    Text(expiryLabel)
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
                 }
-            }
 
-            if let syncError = model.sessionSyncErrors[session.sessionID] {
-                Label(syncError, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .accessibilityIdentifier("session-sync-error")
-            }
-            if !session.status.isEmpty {
-                Label(session.status, systemImage: "waveform.path.ecg")
-                    .font(.subheadline.weight(.medium))
-            }
-            ForEach(session.notifications) { notification in
-                HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(notification.message)
-                            .font(.body)
-                            .textSelection(.enabled)
-                        if let createdAt = notification.createdAt {
-                            RelativeTimeText(timestampMilliseconds: createdAt)
+                if let syncError = model.sessionSyncErrors[session.sessionID] {
+                    Label(syncError, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .accessibilityIdentifier("session-sync-error")
+                }
+                if !session.status.isEmpty {
+                    Label(session.status, systemImage: "waveform.path.ecg")
+                        .font(.subheadline.weight(.medium))
+                }
+                ForEach(session.notifications) { notification in
+                    HStack(alignment: .top, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(notification.message)
+                                .font(.body)
+                                .textSelection(.enabled)
+                            if let createdAt = notification.createdAt {
+                                RelativeTimeText(timestampMilliseconds: createdAt)
+                            }
                         }
-                    }
-                    Spacer(minLength: 8)
-                    Button("Dismiss notification", systemImage: "xmark") {
-                        let sessionID = session.sessionID
-                        let notificationID = notification.id
-                        Task {
-                            await model.dismissNotification(sessionID: sessionID, notificationID: notificationID)
+                        Spacer(minLength: 8)
+                        Button("Dismiss notification", systemImage: "xmark") {
+                            let sessionID = session.sessionID
+                            let notificationID = notification.id
+                            Task {
+                                await model.dismissNotification(sessionID: sessionID, notificationID: notificationID)
+                            }
                         }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
                     }
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
+                }
+                if let request = session.request {
+                    Divider()
+                    HStack(alignment: .top, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(request.prompt)
+                                .font(.headline)
+                            if let createdAt = request.createdAt {
+                                RelativeTimeText(timestampMilliseconds: createdAt)
+                            }
+                        }
+                        Spacer(minLength: 8)
+                        Button("Dismiss request", systemImage: "xmark") {
+                            let sessionID = session.sessionID
+                            let requestID = request.id
+                            responding = true
+                            Task {
+                                await model.dismissRequest(sessionID: sessionID, requestID: requestID)
+                                responding = false
+                            }
+                        }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                        .disabled(responding)
+                    }
+                    ForEach(request.options) { option in
+                        Button(option.label) {
+                            let sessionID = session.sessionID
+                            let requestID = request.id
+                            let optionID = option.id
+                            responding = true
+                            Task {
+                                await model.respond(sessionID: sessionID, requestID: requestID, optionID: optionID)
+                                responding = false
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .disabled(responding)
+                    }
+                }
+                HStack {
+                    Spacer()
+                    Button("Send a message", systemImage: "bubble.left") { showingFeedback = true }
+                        .labelStyle(.iconOnly)
+                        .accessibilityLabel("Send a message")
+                        .buttonStyle(.bordered)
                 }
             }
-            if let request = session.request {
-                Divider()
-                HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(request.prompt)
-                            .font(.headline)
-                        if let createdAt = request.createdAt {
-                            RelativeTimeText(timestampMilliseconds: createdAt)
-                        }
-                    }
-                    Spacer(minLength: 8)
-                    Button("Dismiss request", systemImage: "xmark") {
-                        let sessionID = session.sessionID
-                        let requestID = request.id
-                        responding = true
-                        Task {
-                            await model.dismissRequest(sessionID: sessionID, requestID: requestID)
-                            responding = false
-                        }
-                    }
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                    .disabled(responding)
-                }
-                ForEach(request.options) { option in
-                    Button(option.label) {
-                        let sessionID = session.sessionID
-                        let requestID = request.id
-                        let optionID = option.id
-                        responding = true
-                        Task {
-                            await model.respond(sessionID: sessionID, requestID: requestID, optionID: optionID)
-                            responding = false
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .disabled(responding)
-                }
+            .padding(.vertical, 18)
+            .padding(.trailing, 18)
+            .padding(.leading, 28)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                panelColor.opacity(colorScheme == .dark ? 0.35 : 0.75),
+                in: SessionBubbleShape(tailY: 15 + opecoSize * 1.25)
+            )
+            .overlay {
+                SessionBubbleShape(tailY: 15 + opecoSize * 1.25)
+                    .stroke(session.attention ? Color.brandAccent : Color.primary.opacity(0.08), lineWidth: session.attention ? 2 : 1)
             }
-            HStack {
-                Spacer()
-                Button("Send a message", systemImage: "bubble.left") { showingFeedback = true }
-                    .labelStyle(.iconOnly)
-                    .accessibilityLabel("Send a message")
-                    .buttonStyle(.bordered)
-            }
+            .shadow(color: session.attention ? Color.brandAccent.opacity(0.55) : .clear, radius: 14)
         }
-        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(panelColor.opacity(colorScheme == .dark ? 0.35 : 0.75), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(session.attention ? Color.brandAccent : Color.primary.opacity(0.08), lineWidth: session.attention ? 2 : 1)
-        }
-        .shadow(color: session.attention ? Color.brandAccent.opacity(0.55) : .clear, radius: 14)
-        .onLongPressGesture { toggleAttention() }
-        .accessibilityAction(named: session.attention ? "Stop watching status updates" : "Watch status updates") {
-            toggleAttention()
-        }
         .sensoryFeedback(.success, trigger: attentionChanges)
         .sheet(isPresented: $showingFeedback) {
             FeedbackView(sessionID: session.sessionID, protocolVersion: session.protocolVersion, isPresented: $showingFeedback)
@@ -608,11 +698,55 @@ private struct SessionCard: View {
         session.color.flatMap(Color.init(hex:)) ?? Color(uiColor: .systemBackground)
     }
 
+    private var opecoPalette: OpecoSessionPalette {
+        .nearest(toHex: session.color)
+    }
+
     private var expiryLabel: String {
         let remaining = Double(session.expiresAt) / 1_000 - Date().timeIntervalSince1970
         guard remaining > 0 else { return "Checking expiry" }
         let hours = max(1, Int(ceil(remaining / 3_600)))
         return "~\(hours)h"
+    }
+}
+
+private struct SessionBubbleShape: Shape {
+    let tailY: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let tailWidth = 10.0
+        let tailHalfHeight = 8.0
+        let resolvedTailY = min(tailY, rect.height / 2)
+        let body = CGRect(x: tailWidth, y: 0, width: max(0, rect.width - tailWidth), height: rect.height)
+        let corner = min(20.0, body.width / 2, body.height / 2)
+
+        var path = Path()
+        path.move(to: CGPoint(x: body.minX + corner, y: body.minY))
+        path.addLine(to: CGPoint(x: body.maxX - corner, y: body.minY))
+        path.addQuadCurve(
+            to: CGPoint(x: body.maxX, y: body.minY + corner),
+            control: CGPoint(x: body.maxX, y: body.minY)
+        )
+        path.addLine(to: CGPoint(x: body.maxX, y: body.maxY - corner))
+        path.addQuadCurve(
+            to: CGPoint(x: body.maxX - corner, y: body.maxY),
+            control: CGPoint(x: body.maxX, y: body.maxY)
+        )
+        path.addLine(to: CGPoint(x: body.minX + corner, y: body.maxY))
+        path.addQuadCurve(
+            to: CGPoint(x: body.minX, y: body.maxY - corner),
+            control: CGPoint(x: body.minX, y: body.maxY)
+        )
+        path.addLine(to: CGPoint(x: body.minX, y: resolvedTailY + tailHalfHeight))
+        path.addLine(to: CGPoint(x: rect.minX, y: resolvedTailY))
+        path.addLine(to: CGPoint(x: body.minX, y: resolvedTailY - tailHalfHeight))
+        path.addLine(to: CGPoint(x: body.minX, y: body.minY + corner))
+        path.addQuadCurve(
+            to: CGPoint(x: body.minX + corner, y: body.minY),
+            control: CGPoint(x: body.minX, y: body.minY)
+        )
+        path.closeSubpath()
+        return path
     }
 }
 

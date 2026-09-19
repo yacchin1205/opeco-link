@@ -73,6 +73,7 @@ print "Test results: $results_dir"
 if [[ "$suite" == all ]]; then
   print "Running Worker and Web tests"
   npm run check
+  npm run test:e2e
 
   print "Running Go tests"
   go test -count=1 ./...

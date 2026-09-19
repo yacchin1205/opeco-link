@@ -1,14 +1,14 @@
 ---
-name: notify-guru
-description: Use the notify.guru MCP server (notifyg mcp) to keep a person informed about a long-running agent task on their phone, tablet, or browser — pairing a device group, sending silent status updates and notifications, and asking the person a question with choices. Use whenever the mcp__notify-guru__* tools are available and the user wants to follow, be notified about, or approve steps of a task, and whenever notify.guru's end-to-end encryption is being explained, reviewed, or flagged.
+name: opeco-link
+description: Use the opeco.link MCP server (opeco mcp) to keep a person informed about a long-running agent task on their phone, tablet, or browser — pairing a device group, sending silent status updates and notifications, and asking the person a question with choices. Use whenever the mcp__opeco-link__* tools are available and the user wants to follow, be notified about, or approve steps of a task, and whenever opeco.link's end-to-end encryption is being explained, reviewed, or flagged.
 ---
 
-# notify.guru MCP
+# opeco.link MCP
 
-notify.guru links one agent session to one or more device groups. Payloads after
-pairing are end-to-end encrypted between `notifyg` and the devices. A session
+opeco.link links one agent session to one or more device groups. Payloads after
+pairing are end-to-end encrypted between `opeco` and the devices. A session
 expires about one day after its creator's last activity, and its management keys
-exist only in the `notifyg` process.
+exist only in the `opeco` process.
 
 When explaining or reviewing encryption, the threat model, or a security
 finding, read [references/security.md](references/security.md) completely before
@@ -35,7 +35,7 @@ create another. Calling it is the safe way to recover a forgotten `session_id`.
 - Do not close on ordinary process exit. Let the session expire so unread items
   do not disappear from the person's device.
 
-`unknown local session` means this `notifyg` process lost the in-memory keys;
+`unknown local session` means this `opeco` process lost the in-memory keys;
 create and pair a new session. `request is not open` means it was already
 closed; do not close it defensively.
 
@@ -44,7 +44,7 @@ closed; do not close it defensively.
 `session_create` and `session_pairing_create` provide:
 
 - `qr_image_url`: a loopback PNG held in memory. This is the default when the
-  browser and `notifyg` run on the same machine.
+  browser and `opeco` run on the same machine.
 - `pairing_url`: the live one-shot secret. Use it only for containers, remote
   hosts, or SSH where loopback is not reachable.
 
@@ -62,7 +62,7 @@ Call `session_wait_for_device` before sending any event. Only
 about 60–120 seconds so the user can regain control. A timeout is reported as a
 tool error and is not a failed pairing; retry if still appropriate.
 
-The QR image expires after ten minutes or when `notifyg` exits. If it returns
+The QR image expires after ten minutes or when `opeco` exits. If it returns
 404, create another pairing. Adding a device to an already joined device group
 happens inside the app and requires approval from an existing device; it does
 not use a session pairing.

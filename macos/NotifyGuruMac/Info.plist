@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDisplayName</key>
-	<string>notify.guru</string>
+	<string>opeco.link</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -11,7 +11,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>$(PRODUCT_NAME)</string>
+	<string>opeco.link</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -20,9 +20,10 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>guru.notify.app</string>
+			<string>opeco.link</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
+				<string>opecolink</string>
 				<string>notifyguru</string>
 			</array>
 		</dict>
@@ -36,7 +37,7 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>Copyright © 2026 notify.guru</string>
+	<string>Copyright © 2026 opeco</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>NotifyGuruAppGroupIdentifier</key>

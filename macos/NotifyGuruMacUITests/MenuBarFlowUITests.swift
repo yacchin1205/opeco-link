@@ -11,7 +11,7 @@ final class MenuBarFlowUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-ui-test-session-history"]
         app.launch()
-        let status = app.menuBars.statusItems["notify.guru, 3 unresolved items"]
+        let status = app.menuBars.statusItems["opeco, 3 unresolved items"]
         XCTAssertTrue(status.waitForExistence(timeout: 5))
         status.click()
         attachScreenshot(named: "command-before-response", app: app)
@@ -35,7 +35,7 @@ final class MenuBarFlowUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-ui-test-session-history", "-ui-test-photo-message", "-ui-test-response-error"]
         app.launch()
-        let status = app.menuBars.statusItems["notify.guru, no unresolved items"]
+        let status = app.menuBars.statusItems["opeco, no unresolved items"]
         XCTAssertTrue(status.waitForExistence(timeout: 5))
         status.click()
         let compose = app.buttons["Send a Message"]
@@ -60,10 +60,10 @@ final class MenuBarFlowUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Add Device"].waitForExistence(timeout: 5))
         app.buttons["Add Device"].click()
         wait(for: [absence(of: app.staticTexts["Add a Device?"])], timeout: 5)
-        let status = app.menuBars.statusItems["notify.guru, 3 unresolved items"]
+        let status = app.menuBars.statusItems["opeco, 3 unresolved items"]
         XCTAssertTrue(status.waitForExistence(timeout: 5))
         status.click()
-        app.buttons["Device Group"].click()
+        app.buttons["Manage group"].click()
         XCTAssertTrue(app.buttons["Remove"].waitForExistence(timeout: 5))
         attachScreenshot(named: "command-two-devices", app: app)
         app.buttons["Remove"].click()
@@ -84,10 +84,10 @@ final class MenuBarFlowUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Add Device"].waitForExistence(timeout: 5))
         app.buttons["Add Device"].click()
         wait(for: [absence(of: app.staticTexts["Add a Device?"])], timeout: 5)
-        let status = app.menuBars.statusItems["notify.guru, 3 unresolved items"]
+        let status = app.menuBars.statusItems["opeco, 3 unresolved items"]
         XCTAssertTrue(status.waitForExistence(timeout: 5))
         status.click()
-        app.buttons["Device Group"].click()
+        app.buttons["Manage group"].click()
         let leave = app.buttons["Remove This Mac from the Group"]
         XCTAssertTrue(leave.waitForExistence(timeout: 5))
         attachScreenshot(named: "command-before-leave", app: app)
@@ -103,23 +103,23 @@ final class MenuBarFlowUITests: XCTestCase {
         app.launchArguments = ["-ui-test-recoverable-startup-error"]
         app.launch()
 
-        let warningItem = app.menuBars.statusItems["notify.guru, sync error"]
+        let warningItem = app.menuBars.statusItems["opeco, sync error"]
         XCTAssertTrue(warningItem.waitForExistence(timeout: 5))
         attachScreenshot(named: "40-sync-error-menu-bar-warning", app: app)
         warningItem.click()
 
         XCTAssertTrue(app.staticTexts["Unable to start"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["The saved notify.guru data on this device can no longer be opened."].exists)
+        XCTAssertTrue(app.staticTexts["The saved opeco data on this device can no longer be opened."].exists)
         let erase = app.buttons["Erase Saved Data"]
         XCTAssertTrue(erase.isHittable)
         XCTAssertFalse(app.buttons["Add Session"].isEnabled)
-        XCTAssertFalse(app.buttons["Device Group"].isEnabled)
+        XCTAssertFalse(app.buttons["Manage group"].isEnabled)
         attachScreenshot(named: "41-recoverable-startup-error", app: app)
 
         erase.click()
         XCTAssertTrue(app.staticTexts["UI improvement test"].waitForExistence(timeout: 5))
         attachScreenshot(named: "42-recovered-after-erasing-data", app: app)
-        XCTAssertTrue(app.menuBars.statusItems["notify.guru, 3 unresolved items"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.menuBars.statusItems["opeco, 3 unresolved items"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["Unable to start"].exists)
     }
 
@@ -128,7 +128,7 @@ final class MenuBarFlowUITests: XCTestCase {
         app.launchArguments = ["-ui-test-mixed-session-inheritance"]
         app.launch()
 
-        let statusItem = app.menuBars.statusItems["notify.guru, no unresolved items"]
+        let statusItem = app.menuBars.statusItems["opeco, no unresolved items"]
         XCTAssertTrue(statusItem.waitForExistence(timeout: 5))
         statusItem.click()
         XCTAssertTrue(app.staticTexts["Authenticated v4 session"].waitForExistence(timeout: 5))
@@ -138,12 +138,27 @@ final class MenuBarFlowUITests: XCTestCase {
         attachScreenshot(named: "43-session-retained-after-signer-removal", app: app)
     }
 
+    func testEmptyStateUsesOpecoOutline() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-ui-test-session-history", "-ui-test-empty-sessions"]
+        app.launch()
+
+        let statusItem = app.menuBars.statusItems["opeco, no unresolved items"]
+        XCTAssertTrue(statusItem.waitForExistence(timeout: 5))
+        statusItem.click()
+
+        XCTAssertTrue(app.images["opeco-empty-outline"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["No sessions"].exists)
+        XCTAssertTrue(app.staticTexts["Open or paste a one-shot link shown by opeco."].exists)
+        attachScreenshot(named: "44-opeco-empty-state", app: app)
+    }
+
     func testNotificationHistoryAndRequestDismissalFromMenuBar() {
         let app = XCUIApplication()
         app.launchArguments = ["-ui-test-session-history"]
         app.launch()
 
-        let statusItem = app.menuBars.statusItems["notify.guru, 3 unresolved items"]
+        let statusItem = app.menuBars.statusItems["opeco, 3 unresolved items"]
         XCTAssertTrue(statusItem.waitForExistence(timeout: 5))
         attachScreenshot(named: "00-menu-bar-count", app: app)
         statusItem.click()
@@ -161,7 +176,7 @@ final class MenuBarFlowUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["First accumulated notice"].exists)
         XCTAssertTrue(app.staticTexts["Second accumulated notice"].exists)
         XCTAssertTrue(app.staticTexts["2 unresolved items"].exists)
-        XCTAssertTrue(app.menuBars.statusItems["notify.guru, 2 unresolved items"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.menuBars.statusItems["opeco, 2 unresolved items"].waitForExistence(timeout: 5))
         attachScreenshot(named: "02-notification-dismissed", app: app)
 
         app.buttons["Dismiss Request"].click()
@@ -169,14 +184,14 @@ final class MenuBarFlowUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Continue the meeting?"].exists)
         XCTAssertTrue(app.staticTexts["Second accumulated notice"].exists)
         XCTAssertTrue(app.staticTexts["1 unresolved item"].exists)
-        XCTAssertTrue(app.menuBars.statusItems["notify.guru, 1 unresolved item"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.menuBars.statusItems["opeco, 1 unresolved item"].waitForExistence(timeout: 5))
         attachScreenshot(named: "03-request-dismissed", app: app)
 
         app.buttons["Dismiss Notification"].click()
         wait(for: [absence(of: app.staticTexts["Second accumulated notice"])], timeout: 5)
         XCTAssertFalse(app.staticTexts["Second accumulated notice"].exists)
         XCTAssertFalse(app.staticTexts["1 unresolved item"].exists)
-        XCTAssertTrue(app.menuBars.statusItems["notify.guru, no unresolved items"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.menuBars.statusItems["opeco, no unresolved items"].waitForExistence(timeout: 5))
         attachScreenshot(named: "04-all-cleared", app: app)
     }
 
@@ -195,7 +210,7 @@ final class MenuBarFlowUITests: XCTestCase {
         app.launchArguments = ["-ui-test-session-history", "-ui-test-photo-message"]
         app.launch()
 
-        let statusItem = app.menuBars.statusItems["notify.guru, no unresolved items"]
+        let statusItem = app.menuBars.statusItems["opeco, no unresolved items"]
         XCTAssertTrue(statusItem.waitForExistence(timeout: 5))
         statusItem.click()
         XCTAssertTrue(app.staticTexts["UI improvement test"].waitForExistence(timeout: 5))
@@ -245,7 +260,7 @@ final class MenuBarFlowUITests: XCTestCase {
         app.launchArguments = ["-ui-test-session-history", "-ui-test-session-sync-error"]
         app.launch()
 
-        let statusItem = app.menuBars.statusItems["notify.guru, 3 unresolved items"]
+        let statusItem = app.menuBars.statusItems["opeco, 3 unresolved items"]
         XCTAssertTrue(statusItem.waitForExistence(timeout: 5))
         statusItem.click()
         XCTAssertTrue(app.staticTexts["UI improvement test"].waitForExistence(timeout: 5))
@@ -259,22 +274,22 @@ final class MenuBarFlowUITests: XCTestCase {
         app.launchArguments = ["-ui-test-session-history"]
         app.launch()
 
-        let statusItem = app.menuBars.statusItems["notify.guru, 3 unresolved items"]
+        let statusItem = app.menuBars.statusItems["opeco, 3 unresolved items"]
         XCTAssertTrue(statusItem.waitForExistence(timeout: 5))
         statusItem.click()
-        let title = app.staticTexts["UI improvement test"]
+        let opeco = app.images["session-opeco"]
         let watching = app.images["Watching Status Updates"]
-        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        XCTAssertTrue(opeco.waitForExistence(timeout: 5))
         XCTAssertFalse(watching.exists)
 
-        title.rightClick()
+        opeco.rightClick()
         let watch = app.menuItems["Watch Status Updates"]
         XCTAssertTrue(watch.waitForExistence(timeout: 5))
         watch.click()
         XCTAssertTrue(watching.waitForExistence(timeout: 5))
         attachScreenshot(named: "05-attention-on", app: app)
 
-        title.press(forDuration: 1)
+        opeco.press(forDuration: 1)
         let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: watching)
         XCTAssertEqual(XCTWaiter().wait(for: [gone], timeout: 5), .completed)
         attachScreenshot(named: "06-attention-off", app: app)
@@ -285,7 +300,7 @@ final class MenuBarFlowUITests: XCTestCase {
         app.launchArguments = ["-ui-test-session-history", "-ui-test-dismiss-error"]
         app.launch()
 
-        let statusItem = app.menuBars.statusItems["notify.guru, 3 unresolved items"]
+        let statusItem = app.menuBars.statusItems["opeco, 3 unresolved items"]
         XCTAssertTrue(statusItem.waitForExistence(timeout: 5))
         statusItem.click()
 
@@ -303,18 +318,18 @@ final class MenuBarFlowUITests: XCTestCase {
         app.launchArguments = ["-ui-test-session-history"]
         app.launch()
 
-        let statusItem = app.menuBars.statusItems["notify.guru, 3 unresolved items"]
+        let statusItem = app.menuBars.statusItems["opeco, 3 unresolved items"]
         XCTAssertTrue(statusItem.waitForExistence(timeout: 5))
         statusItem.click()
 
         app.buttons["Add Session"].click()
         XCTAssertTrue(app.staticTexts["Add Session"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Paste the one-shot link shown by notifyg."].exists)
+        XCTAssertTrue(app.staticTexts["Paste the one-shot link shown by opeco."].exists)
         XCTAssertTrue(app.textFields.firstMatch.exists)
         attachScreenshot(named: "05-add-session-window", app: app)
 
         app.typeKey("w", modifierFlags: .command)
-        let deviceGroupButton = app.buttons["Device Group"]
+        let deviceGroupButton = app.buttons["Manage group"]
         if !deviceGroupButton.exists {
             statusItem.click()
         }
@@ -332,13 +347,28 @@ final class MenuBarFlowUITests: XCTestCase {
         app.launchArguments = ["-ui-test-session-history"]
         app.launch()
 
-        XCTAssertTrue(app.menuBars.statusItems["notify.guru, 3 unresolved items"].waitForExistence(timeout: 5))
-        app.open(try XCTUnwrap(URL(string: "notifyguru://sessions")))
+        XCTAssertTrue(app.menuBars.statusItems["opeco, 3 unresolved items"].waitForExistence(timeout: 5))
+        app.open(try XCTUnwrap(URL(string: "opecolink://sessions")))
 
         XCTAssertTrue(app.windows["Sessions"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.windows["Sessions"].staticTexts["UI improvement test"].exists)
         XCTAssertTrue(app.windows["Sessions"].staticTexts["Continue the meeting?"].exists)
         attachScreenshot(named: "07-widget-link-sessions-window", app: app)
+        XCTAssertFalse(app.windows["Add Session"].exists)
+    }
+
+    func testLegacyWidgetLinkStillOpensSessionsWindow() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-ui-test-session-history"]
+        app.launch()
+
+        XCTAssertTrue(app.menuBars.statusItems["opeco, 3 unresolved items"].waitForExistence(timeout: 5))
+        app.open(try XCTUnwrap(URL(string: "notifyguru://sessions")))
+
+        XCTAssertTrue(app.windows["Sessions"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.windows["Sessions"].staticTexts["UI improvement test"].exists)
+        attachScreenshot(named: "08-legacy-widget-link-sessions-window", app: app)
+        XCTAssertFalse(app.windows["Add Session"].exists)
     }
 
     func testDeviceAdditionRequiresConfirmationAndCanBeCancelled() {
@@ -386,7 +416,7 @@ final class MenuBarFlowUITests: XCTestCase {
         app.launchArguments = ["-ui-test-session-link"]
         app.launch()
 
-        let statusItem = app.menuBars.statusItems["notify.guru, 3 unresolved items"]
+        let statusItem = app.menuBars.statusItems["opeco, 3 unresolved items"]
         XCTAssertTrue(statusItem.waitForExistence(timeout: 5))
         statusItem.click()
         app.buttons["Add Session"].click()

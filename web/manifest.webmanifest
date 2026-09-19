@@ -1,11 +1,11 @@
 {
-  "name": "notify.guru",
-  "short_name": "notify",
+  "name": "opeco",
+  "short_name": "opeco",
   "description": "Agent sessions, briefly connected.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#070a10",
-  "theme_color": "#111827",
+  "background_color": "#f2f2f7",
+  "theme_color": "#f2f2f7",
   "icons": [
     {
       "src": "/icon-192.png",

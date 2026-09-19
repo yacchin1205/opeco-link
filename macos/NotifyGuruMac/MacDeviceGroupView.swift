@@ -20,9 +20,9 @@ struct MacDeviceGroupView: View {
                         .textSelection(.enabled)
                 }
 
-                addToGroupSection
-                Divider()
                 devicesSection
+                Divider()
+                addToGroupSection
 
                 if model.isSharingAcrossDevices {
                     Divider()
@@ -116,7 +116,12 @@ struct MacDeviceGroupView: View {
                         }
                         Spacer()
                         if device.deviceID != model.deviceID {
-                            Button("Remove", role: .destructive) { removalTarget = device }
+                            Button(role: .destructive) { removalTarget = device } label: {
+                                Label("Remove", systemImage: "trash")
+                                    .labelStyle(.iconOnly)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(.red)
                         }
                     }
                 }

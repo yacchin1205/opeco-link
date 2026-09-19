@@ -1,4 +1,4 @@
-# notify.guru v4 API
+# opeco.link v4 API
 
 This document defines the client-visible Objects and Operations of protocol v4. Each Operation defines the state changes a caller can establish or observe and the conditions under which it may continue them.
 

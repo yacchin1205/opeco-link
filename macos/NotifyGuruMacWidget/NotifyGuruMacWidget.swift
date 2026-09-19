@@ -14,9 +14,9 @@ struct NotifyGuruWidget: Widget {
             NotifyGuruWidgetView(entry: entry)
                 .containerBackground(.fill.tertiary, for: .widget)
                 .privacySensitive()
-                .widgetURL(URL(string: "notifyguru://sessions")!)
+                .widgetURL(URL(string: "opecolink://sessions")!)
         }
-        .configurationDisplayName("notify.guru Sessions")
+        .configurationDisplayName("opeco.link")
         .description("See current sessions and unresolved items.")
         .supportedFamilies([.systemMedium, .systemLarge])
     }
@@ -53,6 +53,7 @@ struct NotifyGuruTimelineProvider: TimelineProvider {
 
 private struct NotifyGuruWidgetView: View {
     @Environment(\.widgetFamily) private var family
+    @Environment(\.widgetRenderingMode) private var renderingMode
     let entry: NotifyGuruWidgetEntry
 
     var body: some View {
@@ -64,29 +65,42 @@ private struct NotifyGuruWidgetView: View {
             }
         } else if let snapshot = entry.snapshot {
             let sessions = snapshot.activeSessions(at: entry.date)
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: family == .systemMedium ? 6 : 10) {
                 header(unresolvedCount: sessions.reduce(0) { $0 + $1.unresolvedCount })
                 if sessions.isEmpty {
                     ContentUnavailableView {
-                        Label("No sessions", systemImage: "bell")
+                        VStack(spacing: 6) {
+                            Image("OpecoEmpty")
+                                .resizable()
+                                .scaledToFit()
+                                .foregroundStyle(.secondary)
+                                .frame(width: family == .systemLarge ? 72 : 48,
+                                       height: family == .systemLarge ? 72 : 48)
+                            Text("No sessions")
+                        }
                     } description: {
-                        Text("Open notify.guru to connect a session.")
+                        Text("Open opeco.link to connect a session.")
                     }
                 } else {
                     ForEach(sessions.prefix(family == .systemLarge ? 4 : 2)) { session in
-                        WidgetSessionRow(session: session)
+                        WidgetSessionRow(session: session, compact: family == .systemMedium)
                     }
                 }
                 Spacer(minLength: 0)
             }
-            .padding()
         }
     }
 
     private func header(unresolvedCount: Int) -> some View {
         HStack {
-            Label("notify.guru", systemImage: unresolvedCount == 0 ? "bell" : "bell.badge.fill")
-                .font(.headline)
+            HStack(spacing: 6) {
+                Image(renderingMode == .fullColor ? "OpecoSession" : "OpecoEmpty")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 22, height: 22)
+                Text("opeco.link")
+                    .font(.headline)
+            }
             Spacer()
             if unresolvedCount > 0 {
                 Text("\(unresolvedCount)")
@@ -103,33 +117,39 @@ private struct NotifyGuruWidgetView: View {
 
 private struct WidgetSessionRow: View {
     let session: WidgetSessionSnapshot
+    let compact: Bool
 
     var body: some View {
-        HStack(spacing: 10) {
-            RoundedRectangle(cornerRadius: 3)
-                .fill(session.color.flatMap(Color.init(hex:)) ?? .secondary)
-                .frame(width: 5)
-            VStack(alignment: .leading, spacing: 3) {
-                HStack {
-                    Text(session.title)
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(1)
-                    Spacer()
-                    if session.unresolvedCount > 0 {
-                        Text("\(session.unresolvedCount)")
-                            .font(.caption2.bold().monospacedDigit())
-                    }
-                }
-                Label(session.summary, systemImage: session.itemKind.symbol)
-                    .font(.caption)
+        VStack(alignment: .leading, spacing: 3) {
+            HStack {
+                Text(session.title)
+                    .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
-                Text(Date(timeIntervalSince1970: Double(session.updatedAt) / 1_000), style: .relative)
-                    .font(.caption2.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                Spacer()
+                if compact {
+                    updatedTime
+                }
+                if session.unresolvedCount > 0 {
+                    Text("\(session.unresolvedCount)")
+                        .font(.caption2.bold().monospacedDigit())
+                }
+            }
+            Label(session.summary, systemImage: session.itemKind.symbol)
+                .font(.caption)
+                .lineLimit(1)
+            if !compact {
+                updatedTime
             }
         }
-        .padding(8)
-        .background((session.color.flatMap(Color.init(hex:)) ?? .secondary).opacity(0.16), in: RoundedRectangle(cornerRadius: 10))
+        .padding(compact ? 6 : 8)
+        .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private var updatedTime: some View {
+        Text(Date(timeIntervalSince1970: Double(session.updatedAt) / 1_000), style: .relative)
+            .font(.caption2.monospacedDigit())
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
     }
 }
 
@@ -140,18 +160,6 @@ private extension WidgetItemKind {
         case .request: "questionmark.bubble.fill"
         case .status: "waveform.path.ecg"
         }
-    }
-}
-
-private extension Color {
-    init?(hex: String) {
-        guard hex.range(of: #"^#[0-9a-fA-F]{6}$"#, options: .regularExpression) != nil,
-              let value = UInt64(hex.dropFirst(), radix: 16) else { return nil }
-        self.init(
-            red: Double((value >> 16) & 0xff) / 255,
-            green: Double((value >> 8) & 0xff) / 255,
-            blue: Double(value & 0xff) / 255
-        )
     }
 }
 

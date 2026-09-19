@@ -6,6 +6,7 @@
 	<array><string>$(AppIdentifierPrefix)guru.notify.app</string></array>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
+		<string>applinks:opeco.link</string>
 		<string>applinks:notify.guru</string>
 	</array>
 	<key>aps-environment</key>

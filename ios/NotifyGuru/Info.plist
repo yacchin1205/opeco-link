@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDisplayName</key>
-	<string>notify.guru</string>
+	<string>opeco</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -23,7 +23,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>notify.guru uses the camera to scan pairing QR codes and attach a photo to an encrypted message.</string>
+	<string>opeco uses the camera to scan pairing QR codes and attach a photo to an encrypted message.</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

@@ -3,25 +3,29 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#111827">
+    <meta name="theme-color" content="#f2f2f7">
     <meta name="description" content="Agent sessions, briefly connected.">
     <link rel="manifest" href="/manifest.webmanifest">
-    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icon-192.png">
     <link rel="stylesheet" href="/styles.css">
-    <title>notify.guru</title>
+    <title>opeco</title>
   </head>
   <body>
     <header>
-      <a class="brand" href="/">notify.guru</a>
-      <span id="connection-state" aria-live="polite">準備中</span>
+      <a class="brand" href="/">
+        <img src="/opeco/outline.svg" width="44" height="44" alt="">
+        <span>opeco.link</span>
+      </a>
+      <div class="header-actions">
+        <span id="connection-state" aria-live="polite">準備中</span>
+        <button id="open-device-management" class="icon-button" type="button" aria-label="デバイスグループの管理" title="デバイスグループの管理" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 16H3V4h15v4M1 19h13"/><rect x="16" y="9" width="7" height="13" rx="1.5"/><path d="M19 19h1"/></svg>
+          <span id="device-count" aria-hidden="true" hidden></span>
+        </button>
+      </div>
     </header>
     <main>
-      <section id="intro">
-        <p class="eyebrow">EPHEMERAL AGENT NOTIFICATIONS</p>
-        <h1>作業の続きを、手元で待つ。</h1>
-        <p>CLIに表示されたQRコードをデバイスのカメラで読み取ると、この画面にセッションが追加されます。</p>
-      </section>
       <p id="message" role="status" aria-live="polite"></p>
       <section id="startup-error" class="group-card error-card" hidden>
         <p class="card-label">ERROR</p>
@@ -32,28 +36,21 @@
           <button id="reset-local-data" class="destructive" type="button">このデバイスのデータをリセット</button>
         </div>
       </section>
-      <section id="device-summary" class="group-card" hidden>
-        <div class="card-head">
-          <div>
-            <p class="card-label">DEVICE GROUP</p>
-            <h2 id="device-summary-title">共有なし</h2>
-          </div>
-          <button id="open-device-management" type="button">デバイスグループの管理</button>
-        </div>
-      </section>
       <section id="device-management" class="group-card" hidden>
         <div class="card-head">
           <div>
-            <p class="card-label">DEVICE GROUP</p>
             <h2>デバイスグループの管理</h2>
           </div>
-          <button id="close-device-management" type="button">完了</button>
+          <button id="close-device-management" class="icon-button" type="button" aria-label="閉じる" title="閉じる"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
         </div>
         <p id="group-status"></p>
-        <p id="group-key-time"></p>
-        <button id="request-device-sharing" type="button">このデバイスを別のグループに追加する</button>
+        <h3 class="card-label">GROUP DEVICES</h3>
         <div id="group-devices"></div>
-        <button id="leave-device-group" class="destructive" type="button" hidden>このデバイスをグループから除外する</button>
+        <p id="group-key-time"></p>
+        <hr>
+        <p>この端末を、すでに使っている端末と同じグループに追加できます。</p>
+        <button id="request-device-sharing" type="button">このデバイスを別のグループに追加</button>
+        <button id="leave-device-group" class="destructive" type="button" hidden>このデバイスをグループから除外</button>
       </section>
       <section id="join-device" class="group-card" hidden>
         <p class="card-label">DEVICE GROUP</p>
@@ -64,15 +61,17 @@
       </section>
       <section id="cards" aria-label="セッション"></section>
       <section id="empty" hidden>
-        <div class="empty-mark" aria-hidden="true">⌁</div>
-        <p>参加中のセッションはありません。</p>
+        <div class="empty-mark" role="img" aria-label="opeco"></div>
+        <h2>セッションがありません</h2>
+        <p>opecoに表示されたワンショットQRコードをデバイスのカメラで読み取るか、リンクをこのブラウザで開いてください。</p>
       </section>
     </main>
     <template id="card-template">
       <article class="card">
+        <img class="session-opeco" src="/opeco/blue.svg" alt="opeco" width="45" height="45">
+        <div class="session-panel">
         <div class="card-head">
           <div>
-            <p class="card-label">SESSION</p>
             <h2 class="session-title"></h2>
           </div>
           <div class="card-meta">
@@ -94,7 +93,7 @@
           <div class="request-options"></div>
         </section>
         <section class="feedback">
-          <button class="feedback-toggle" type="button" aria-label="メッセージを送る" title="メッセージを送る">💬</button>
+          <button class="feedback-toggle icon-button" type="button" aria-label="メッセージを送る" title="メッセージを送る"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3v4l5-4h8a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Z"/></svg></button>
           <form class="feedback-form" hidden>
             <label>このセッションへメッセージを送る
               <textarea class="feedback-message" name="message" maxlength="20000"></textarea>
@@ -109,8 +108,10 @@
             </div>
           </form>
         </section>
+        </div>
       </article>
     </template>
+    <template id="remove-device-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></template>
     <script type="module" src="/app.js"></script>
   </body>
 </html>

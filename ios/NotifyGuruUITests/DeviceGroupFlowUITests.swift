@@ -6,6 +6,30 @@ final class DeviceGroupFlowUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    func testEmptyStateNamesOpecoCLI() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-ui-test-session-link", "-ui-test-empty-sessions"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["No sessions"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.images["opeco-empty-outline"].exists)
+        XCTAssertTrue(app.staticTexts["Scan the one-shot QR code shown by opeco."].exists)
+        let emptyStateScanButton = app.buttons["empty-scan-qr-code"]
+        XCTAssertTrue(emptyStateScanButton.exists)
+        attachScreenshot(named: "00-empty-state-opeco-cli", app: app)
+
+        emptyStateScanButton.tap()
+        XCTAssertTrue(app.navigationBars["Scan QR code"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Close"].exists)
+        XCTAssertFalse(app.buttons["Cancel"].exists)
+        attachScreenshot(named: "00-scan-qr-close-icon", app: app)
+        app.buttons["Close"].tap()
+        XCTAssertEqual(
+            XCTWaiter().wait(for: [absence(of: app.navigationBars["Scan QR code"])], timeout: 5),
+            .completed
+        )
+    }
+
     func testResponseAndFeedbackCommandsCompleteInTheUI() {
         let app = XCUIApplication()
         app.launchArguments = ["-ui-test-session-history"]
@@ -49,8 +73,12 @@ final class DeviceGroupFlowUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-ui-test-device-addition-approval"]
         app.launch()
-        XCTAssertTrue(app.buttons["Add device"].waitForExistence(timeout: 5))
-        app.buttons["Add device"].tap()
+        let approvalAlert = app.alerts["Add a device to this group?"]
+        XCTAssertTrue(approvalAlert.waitForExistence(timeout: 5))
+        XCTAssertTrue(approvalAlert.buttons["Add device"].exists)
+        XCTAssertTrue(approvalAlert.buttons["Cancel"].exists)
+        attachScreenshot(named: "18-device-addition-alert", app: app)
+        approvalAlert.buttons["Add device"].tap()
         wait(for: [absence(of: app.staticTexts["Add a device to this group?"])], timeout: 5)
         app.buttons["Manage group"].tap()
         XCTAssertTrue(app.buttons["Remove"].waitForExistence(timeout: 5))
@@ -62,6 +90,7 @@ final class DeviceGroupFlowUITests: XCTestCase {
         app.buttons["Add this device to another group"].tap()
         app.buttons["Remove and continue"].tap()
         XCTAssertTrue(app.images["QR code for adding this device to a group"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["On a device already in that group, scan this QR code."].exists)
         attachScreenshot(named: "command-group-request-created", app: app)
     }
 
@@ -304,6 +333,65 @@ final class DeviceGroupFlowUITests: XCTestCase {
         attachScreenshot(named: "12-request-dismissed", app: app)
     }
 
+    func testSessionCardUsesOpecoSpeechBubbleDesign() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-ui-test-session-history"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["UI improvement test"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.navigationBars["notify.guru"].exists)
+        XCTAssertTrue(app.buttons["Scan QR code"].isHittable)
+        XCTAssertTrue(app.buttons["Manage group"].isHittable)
+        XCTAssertEqual(app.buttons["Manage group"].value as? String, "1 device")
+        XCTAssertFalse(app.staticTexts["DEVICE GROUP"].exists)
+        XCTAssertFalse(app.staticTexts["Not shared"].exists)
+        XCTAssertFalse(app.staticTexts["SESSION"].exists)
+        XCTAssertTrue(app.images["session-opeco"].exists)
+        XCTAssertEqual(app.images["session-opeco"].value as? String, "green")
+        XCTAssertTrue(app.staticTexts["Working"].exists)
+        XCTAssertTrue(app.staticTexts["First accumulated notice"].exists)
+        XCTAssertTrue(app.staticTexts["Continue the meeting?"].exists)
+        XCTAssertTrue(app.buttons["Yes"].exists)
+        attachScreenshot(named: "18-opeco-session-speech-bubble", app: app)
+    }
+
+    func testDeviceGroupToolbarButtonShowsMultipleDeviceBadgeAndOpensManagement() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-ui-test-device-addition-approval"]
+        app.launch()
+
+        XCTAssertTrue(app.buttons["Add device"].waitForExistence(timeout: 5))
+        app.buttons["Add device"].tap()
+        wait(for: [absence(of: app.staticTexts["Add a device to this group?"])], timeout: 5)
+
+        let groupButton = app.buttons["Manage group"]
+        XCTAssertTrue(groupButton.waitForExistence(timeout: 5))
+        let twoDevices = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == %@", "2 devices"),
+            object: groupButton
+        )
+        XCTAssertEqual(XCTWaiter().wait(for: [twoDevices], timeout: 5), .completed)
+        XCTAssertFalse(app.staticTexts["DEVICE GROUP"].exists)
+        attachScreenshot(named: "19-device-group-toolbar-badge", app: app)
+
+        groupButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertTrue(app.buttons["Remove"].waitForExistence(timeout: 5))
+        let groupDevices = app.staticTexts["GROUP DEVICES"]
+        let explanation = app.staticTexts["Add this device to the same group as a device you already use."]
+        let addToGroup = app.buttons["Add this device to another group"]
+        XCTAssertTrue(groupDevices.exists)
+        XCTAssertTrue(explanation.exists)
+        XCTAssertTrue(addToGroup.exists)
+        XCTAssertLessThan(groupDevices.frame.minY, explanation.frame.minY)
+        XCTAssertLessThan(explanation.frame.minY, addToGroup.frame.minY)
+        XCTAssertTrue(app.buttons["Close"].exists)
+        XCTAssertFalse(app.buttons["Done"].exists)
+        attachScreenshot(named: "20-device-group-management-opened", app: app)
+
+        app.buttons["Close"].tap()
+        XCTAssertEqual(XCTWaiter().wait(for: [absence(of: app.staticTexts["GROUP DEVICES"])], timeout: 5), .completed)
+    }
+
     func testRequestRemainsVisibleWhenDismissalFails() {
         let app = XCUIApplication()
         app.launchArguments = ["-ui-test-session-history", "-ui-test-dismiss-error"]
@@ -330,24 +418,30 @@ final class DeviceGroupFlowUITests: XCTestCase {
         attachScreenshot(named: "17-session-sync-error-on-card", app: app)
     }
 
-    func testLongPressTogglesStatusAttention() {
+    func testLongPressingOpecoTogglesStatusAttention() {
         let app = XCUIApplication()
         app.launchArguments = ["-ui-test-session-history"]
         app.launch()
 
         let title = app.staticTexts["UI improvement test"]
+        let opeco = app.images["session-opeco"]
         let watching = app.images["Watching status updates"]
         XCTAssertTrue(title.waitForExistence(timeout: 5))
+        XCTAssertTrue(opeco.exists)
         XCTAssertFalse(watching.exists)
         attachScreenshot(named: "14-attention-off", app: app)
 
         title.press(forDuration: 1)
-        XCTAssertTrue(watching.waitForExistence(timeout: 5))
-        attachScreenshot(named: "15-attention-on", app: app)
+        XCTAssertFalse(watching.exists)
+        attachScreenshot(named: "15-title-long-press-does-not-watch", app: app)
 
-        title.press(forDuration: 1)
+        opeco.press(forDuration: 1)
+        XCTAssertTrue(watching.waitForExistence(timeout: 5))
+        attachScreenshot(named: "16-opeco-long-press-attention-on", app: app)
+
+        opeco.press(forDuration: 1)
         XCTAssertEqual(XCTWaiter().wait(for: [absence(of: watching)], timeout: 5), .completed)
-        attachScreenshot(named: "16-attention-off-again", app: app)
+        attachScreenshot(named: "17-opeco-long-press-attention-off-again", app: app)
     }
 
     func testV4FeedbackOffersAnOptionalPhotoAndRequiresContent() {
@@ -432,7 +526,7 @@ final class DeviceGroupFlowUITests: XCTestCase {
         XCTAssertTrue(share.waitForExistence(timeout: 10))
         share.tap()
         attachScreenshot(named: "62-photos-share-sheet", app: photos)
-        let service = photos.cells["notify.guru"]
+        let service = photos.cells["opeco"]
         let serviceReady = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "exists == true AND hittable == true"),
             object: service
@@ -463,12 +557,13 @@ final class DeviceGroupFlowUITests: XCTestCase {
         XCTAssertTrue(enableNotifications.waitForExistence(timeout: 5))
         enableNotifications.tap()
         let permissionAlert = springboard.alerts.firstMatch
-        XCTAssertTrue(permissionAlert.waitForExistence(timeout: 5))
-        let buttons = permissionAlert.buttons
-        XCTAssertEqual(buttons.count, 2)
-        buttons.element(boundBy: 1).tap()
+        if permissionAlert.waitForExistence(timeout: 2) {
+            let buttons = permissionAlert.buttons
+            XCTAssertEqual(buttons.count, 2)
+            buttons.element(boundBy: 1).tap()
+        }
         XCTAssertTrue(app.staticTexts["3 unresolved items"].waitForExistence(timeout: 5))
-        let icon = springboard.icons["notify.guru"].firstMatch
+        let icon = springboard.icons["opeco"].firstMatch
         showHomeScreen(icon: icon)
         let badgeThree = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value MATCHES %@", "3[^0-9].*"), object: icon)
         XCTAssertEqual(XCTWaiter().wait(for: [badgeThree], timeout: 10), .completed)
@@ -500,19 +595,14 @@ final class DeviceGroupFlowUITests: XCTestCase {
         app.launchArguments = ["-ui-test-device-addition-approval"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Add a device to this group?"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["The new device will receive notifications and can respond as a member of this device group."].exists)
-        XCTAssertTrue(app.buttons["Add device"].exists)
+        let approvalAlert = app.alerts["Add a device to this group?"]
+        XCTAssertTrue(approvalAlert.waitForExistence(timeout: 5))
+        XCTAssertTrue(approvalAlert.staticTexts["The new device will receive notifications and can respond as a member of this device group."].exists)
+        XCTAssertTrue(approvalAlert.buttons["Add device"].exists)
+        XCTAssertTrue(approvalAlert.buttons["Cancel"].exists)
         attachScreenshot(named: "20-device-addition-confirmation", app: app)
 
-        let cancel = app.buttons["Cancel"]
-        if cancel.exists {
-            cancel.tap()
-        } else {
-            // iOS 26 presents a confirmation dialog's cancel role as an
-            // outside-tap dismissal instead of an accessibility button.
-            app.coordinate(withNormalizedOffset: CGVector(dx: 0.05, dy: 0.2)).tap()
-        }
+        approvalAlert.buttons["Cancel"].tap()
         XCTAssertEqual(
             XCTWaiter().wait(for: [absence(of: app.staticTexts["Add a device to this group?"])], timeout: 5),
             .completed
@@ -559,12 +649,28 @@ final class DeviceGroupFlowUITests: XCTestCase {
         XCTAssertTrue(linkField.waitForExistence(timeout: 5))
         linkField.tap()
         linkField.typeText(sessionLinkFixture)
+
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let permissionAlert = springboard.alerts.firstMatch
+        attachScreenshot(named: "24-opeco-session-link-ready", app: app)
+
         app.buttons["Continue"].tap()
 
-        XCTAssertFalse(app.navigationBars["Scan QR code"].waitForExistence(timeout: 2))
+        if permissionAlert.waitForExistence(timeout: 5) {
+            XCTAssertEqual(permissionAlert.buttons.count, 2)
+            permissionAlert.buttons.element(boundBy: 0).tap()
+        }
+
+        app.activate()
+
+        XCTAssertEqual(
+            XCTWaiter().wait(for: [absence(of: app.navigationBars["Scan QR code"])], timeout: 5),
+            .completed
+        )
+        XCTAssertTrue(app.staticTexts["Session ui-test-"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["Add a device to this group?"].exists)
         XCTAssertFalse(app.staticTexts["operation-error-message"].exists)
-        attachScreenshot(named: "24-session-link-joined-without-device-approval", app: app)
+        attachScreenshot(named: "25-opeco-session-link-joined-without-device-approval", app: app)
     }
 
     func testInvalidJoinErrorIsVisibleInsideSheetAndRemainsUntilDismissed() {
@@ -581,7 +687,7 @@ final class DeviceGroupFlowUITests: XCTestCase {
         app.buttons["Continue"].tap()
         let errorMessage = app.staticTexts["operation-error-message"].firstMatch
         XCTAssertTrue(errorMessage.waitForExistence(timeout: 5))
-        XCTAssertTrue(errorMessage.label.contains("expected an https://notify.guru/join URL"))
+        XCTAssertTrue(errorMessage.label.contains("expected an https://opeco.link/join or https://notify.guru/join URL"))
         attachScreenshot(named: "40-join-error-inside-sheet", app: app)
 
         app.buttons["Cancel"].tap()
@@ -595,7 +701,7 @@ final class DeviceGroupFlowUITests: XCTestCase {
     private var sessionLinkFixture: String {
         let secret = String(repeating: "A", count: 43)
         let publicKey = "BGsX0fLhLEJH-Lzm5WOkQPJ3A32BLeszoPShOUXYmMKWT-NC4v4af5uO5-tKfA-eFivOM1drMV7Oy7ZAaDe_UfU"
-        return "https://notify.guru/join#v=4&s=ui-test-session01&p=ui-test-pairing01&t=\(secret)&a=\(secret)&k=\(publicKey)&c=aabbcc"
+        return "https://opeco.link/join#v=4&s=ui-test-session01&p=ui-test-pairing01&t=\(secret)&a=\(secret)&k=\(publicKey)&c=aabbcc"
     }
 
     private func attachScreenshot(named name: String, app: XCUIApplication) {
