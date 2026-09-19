@@ -169,7 +169,7 @@ export class DeviceRegistry extends DurableObject<DeviceEnv> {
     const signingPublicKey = stringField(body, "signingPublicKey", PUBLIC_KEY, 128);
     const nonce = stringField(body, "nonce", BASE64URL, 128);
     const signature = stringField(body, "signature", SIGNATURE, 128);
-    const transcript = ["notify.guru/device-create/v1", signingPublicKey, nonce].join("\n");
+    const transcript = ["opeco.link/device-create/v1", signingPublicKey, nonce].join("\n");
     if (!(await verifyP256Signature(signingPublicKey, signature, transcript))) {
       throw new HttpError(401, "invalid_device_signature", "Device signature is invalid");
     }
@@ -196,7 +196,7 @@ export class DeviceRegistry extends DurableObject<DeviceEnv> {
     const environment = stringField(body, "environment", /^(sandbox|production)$/, 10);
     const signature = stringField(body, "signature", SIGNATURE, 128);
     const device = this.requiredDevice(deviceId);
-    const transcript = ["notify.guru/device-push/v1", deviceId, token, environment].join("\n");
+    const transcript = ["opeco.link/device-push/v1", deviceId, token, environment].join("\n");
     if (!(await verifyP256Signature(device.signing_public_key, signature, transcript))) {
       throw new HttpError(401, "invalid_device_signature", "Device signature is invalid");
     }
@@ -227,7 +227,7 @@ export class DeviceRegistry extends DurableObject<DeviceEnv> {
     const protocolVersion = body.protocolVersion === undefined ? 3 : integerProtocolVersion(body.protocolVersion);
     const device = this.requiredDevice(deviceId);
     const transcript = [
-      protocolVersion === 4 ? "notify.guru/device-request/v2" : "notify.guru/device-request/v1",
+      protocolVersion === 4 ? "opeco.link/device-request/v2" : "opeco.link/device-request/v1",
       requestId,
       deviceId,
       accessHash,

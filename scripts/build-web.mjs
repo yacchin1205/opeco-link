@@ -29,7 +29,7 @@ await Promise.all(staticFiles.map(async (name) => {
 await copyFile(join(root, "brand/icon-ios.svg"), join(output, "icon.svg"));
 await copyFile(join(root, "brand/favicon.svg"), join(output, "favicon.svg"));
 await mkdir(join(output, "opeco"));
-const iosAssets = join(root, "ios/NotifyGuru/Assets.xcassets");
+const iosAssets = join(root, "ios/Opeco/Assets.xcassets");
 await copyFile(join(iosAssets, "OpecoEmpty.imageset/opeco-outline.svg"), join(output, "opeco/outline.svg"));
 for (const color of ["blue", "cyan", "green", "orange", "red", "yellow", "purple", "pink"]) {
   const suffix = color === "blue" ? "" : color[0].toUpperCase() + color.slice(1);

@@ -44,7 +44,7 @@ export async function createKeyPackage(groupId, groupKey, device) {
   const ciphertext = await crypto.subtle.encrypt(
     { name: "AES-GCM", iv: nonce, additionalData: encoder.encode(context) },
     key,
-    encoder.encode(["notify.guru/group-key/v2", groupKey.publicKey, groupKey.privateKey].join("\n")),
+    encoder.encode(["opeco.link/group-key/v2", groupKey.publicKey, groupKey.privateKey].join("\n")),
   );
   return {
     deviceId: device.deviceId,
@@ -69,7 +69,7 @@ export async function openKeyPackage(identity, groupId, keyRecord, keyPackage) {
     decode(keyPackage.ciphertext),
   );
   const fields = decoder.decode(plaintext).split("\n");
-  if (fields.length !== 3 || fields[0] !== "notify.guru/group-key/v2" || fields[1] !== keyRecord.publicKey) {
+  if (fields.length !== 3 || fields[0] !== "opeco.link/group-key/v2" || fields[1] !== keyRecord.publicKey) {
     throw new Error("Key package contains an invalid group key");
   }
   const groupKey = { timestamp: keyRecord.timestamp, publicKey: fields[1], privateKey: fields[2] };
@@ -81,7 +81,7 @@ export async function deriveSessionKey(groupKey, creatorPublicKey, sessionId, gr
   const privateKey = await groupPrivateKey(groupKey, "ECDH", ["deriveBits"]);
   const publicKey = await importPublic(creatorPublicKey, "ECDH");
   const shared = await crypto.subtle.deriveBits({ name: "ECDH", public: publicKey }, privateKey, 256);
-  return hkdfKey(shared, `notify.guru/session/v${protocolVersion}\n${sessionId}\n${groupId}\n${groupKey.timestamp}`);
+  return hkdfKey(shared, `opeco.link/session/v${protocolVersion}\n${sessionId}\n${groupId}\n${groupKey.timestamp}`);
 }
 
 export async function pairingProof(
@@ -99,7 +99,7 @@ export async function pairingProof(
 
 export function sessionDescriptorTranscript(descriptor) {
   return [
-    "notify.guru/session-descriptor/v1", descriptor.sessionId, descriptor.groupId,
+    "opeco.link/session-descriptor/v1", descriptor.sessionId, descriptor.groupId,
     String(descriptor.protocolVersion), descriptor.creatorPublicKey, String(descriptor.keyTimestamp),
     descriptor.transitionHash, descriptor.actorDeviceId,
   ].join("\n");
@@ -162,25 +162,25 @@ export async function authenticatedInheritedSessions(sessions, groupId, transiti
 }
 
 export function deviceCreateTranscript(signingPublicKey, nonce) {
-  return ["notify.guru/device-create/v1", signingPublicKey, nonce].join("\n");
+  return ["opeco.link/device-create/v1", signingPublicKey, nonce].join("\n");
 }
 
 export function groupCreateTranscript(groupId, identity, accessHash) {
   return [
-    "notify.guru/group-create/v2", groupId, identity.deviceId, accessHash, identity.encryptionPublicKey,
+    "opeco.link/group-create/v2", groupId, identity.deviceId, accessHash, identity.encryptionPublicKey,
   ].join("\n");
 }
 
 export function deviceRequestTranscript(requestId, identity, accessHash, protocolVersion = 3) {
   return [
-    protocolVersion === 4 ? "notify.guru/device-request/v2" : "notify.guru/device-request/v1",
+    protocolVersion === 4 ? "opeco.link/device-request/v2" : "opeco.link/device-request/v1",
     requestId, identity.deviceId, accessHash, identity.encryptionPublicKey,
     ...(protocolVersion === 4 ? ["3,4"] : []),
   ].join("\n");
 }
 
 export function deviceRequestReadTranscript(requestId, deviceId) {
-  return ["notify.guru/device-request-read/v1", requestId, deviceId].join("\n");
+  return ["opeco.link/device-request-read/v1", requestId, deviceId].join("\n");
 }
 
 export function groupKeyRegisterTranscript(groupId, actorDeviceId, body) {
@@ -192,7 +192,7 @@ export function groupKeyRegisterTranscript(groupId, actorDeviceId, body) {
     return item;
   });
   const lines = [
-    "notify.guru/group-key-register/v1",
+    "opeco.link/group-key-register/v1",
     groupId,
     actorDeviceId,
     body.publicKey,
@@ -206,11 +206,11 @@ export function groupKeyRegisterTranscript(groupId, actorDeviceId, body) {
 }
 
 export function groupDeviceApproveTranscript(groupId, actorDeviceId, requestId) {
-  return ["notify.guru/group-device-approve/v1", groupId, actorDeviceId, requestId].join("\n");
+  return ["opeco.link/group-device-approve/v1", groupId, actorDeviceId, requestId].join("\n");
 }
 
 export function groupDeviceRemoveTranscript(groupId, actorDeviceId, deviceId) {
-  return ["notify.guru/group-device-remove/v1", groupId, actorDeviceId, deviceId].join("\n");
+  return ["opeco.link/group-device-remove/v1", groupId, actorDeviceId, deviceId].join("\n");
 }
 
 export async function signDevice(identity, transcript) {
@@ -253,7 +253,7 @@ export function groupTransitionTranscript(groupId, transition) {
   const members = [...transition.members].sort((left, right) => canonicalCompare(left.deviceId, right.deviceId));
   const packages = [...transition.packageDigests].sort((left, right) => canonicalCompare(left.deviceId, right.deviceId));
   const lines = [
-    "notify.guru/group-transition/v1", groupId, transition.transitionId, transition.previousHash,
+    "opeco.link/group-transition/v1", groupId, transition.transitionId, transition.previousHash,
     String(transition.timestamp), transition.actorDeviceId, transition.publicKey,
     transition.recreated ? "1" : "0", String(members.length),
   ];
@@ -265,7 +265,7 @@ export function groupTransitionTranscript(groupId, transition) {
 
 export async function groupTransitionHash(groupId, transition, actorSignature, continuitySignature) {
   return sha256Text([
-    "notify.guru/group-transition-hash/v2",
+    "opeco.link/group-transition-hash/v2",
     groupTransitionTranscript(groupId, transition),
   ].join("\n"));
 }
@@ -353,7 +353,7 @@ export async function verifyKeyPackageDigest(keyPackage, transition) {
 
 export async function deviceRequestBindingHash(request) {
   return sha256Text([
-    "notify.guru/device-request-binding/v1",
+    "opeco.link/device-request-binding/v1",
     request.requestId,
     request.deviceId,
     request.signingPublicKey,
@@ -367,7 +367,7 @@ export async function deviceApprovalProof(authSecret, requestId, groupId, transi
   const key = await crypto.subtle.importKey(
     "raw", decode(authSecret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
   );
-  const transcript = ["notify.guru/device-approval/v1", requestId, groupId, transitionHash].join("\n");
+  const transcript = ["opeco.link/device-approval/v1", requestId, groupId, transitionHash].join("\n");
   return encode(await crypto.subtle.sign("HMAC", key, encoder.encode(transcript)));
 }
 
@@ -380,7 +380,7 @@ export async function verifyDeviceApprovalProof(authSecret, requestId, groupId, 
 
 export async function groupKeyPackageDigest(keyPackage) {
   return sha256Text([
-    "notify.guru/group-key-package/v1", keyPackage.deviceId, keyPackage.ephemeralPublicKey,
+    "opeco.link/group-key-package/v1", keyPackage.deviceId, keyPackage.ephemeralPublicKey,
     keyPackage.nonce, keyPackage.ciphertext,
   ].join("\n"));
 }
@@ -413,7 +413,7 @@ export async function encryptAttachment(groupKey, creatorPublicKey, sessionId, g
   const shared = await crypto.subtle.deriveBits({ name: "ECDH", public: publicKey }, privateKey, 256);
   const key = await hkdfKey(
     shared,
-    `notify.guru/attachment/v4\n${sessionId}\n${groupId}\n${groupKey.timestamp}\n${responseId}\n${attachmentId}`,
+    `opeco.link/attachment/v4\n${sessionId}\n${groupId}\n${groupKey.timestamp}\n${responseId}\n${attachmentId}`,
   );
   const nonce = crypto.getRandomValues(new Uint8Array(12));
   const ciphertext = new Uint8Array(await crypto.subtle.encrypt(
@@ -421,7 +421,7 @@ export async function encryptAttachment(groupKey, creatorPublicKey, sessionId, g
       name: "AES-GCM",
       iv: nonce,
       additionalData: encoder.encode(
-        `notify.guru/v4/attachment/${sessionId}/${groupId}/${groupKey.timestamp}/${responseId}/${attachmentId}`,
+        `opeco.link/v4/attachment/${sessionId}/${groupId}/${groupKey.timestamp}/${responseId}/${attachmentId}`,
       ),
     },
     key,
@@ -515,15 +515,15 @@ async function sign(privateKey, transcript) {
 }
 
 function packageContext(groupId, publicKey, deviceId) {
-  return `notify.guru/group-package/v2\n${groupId}\n${publicKey}\n${deviceId}`;
+  return `opeco.link/group-package/v2\n${groupId}\n${publicKey}\n${deviceId}`;
 }
 
 function eventAad(protocolVersion, sessionId, groupId, timestamp, eventId) {
-  return `notify.guru/v${protocolVersion}/event/${sessionId}/${groupId}/${timestamp}/${eventId}`;
+  return `opeco.link/v${protocolVersion}/event/${sessionId}/${groupId}/${timestamp}/${eventId}`;
 }
 
 function responseAad(protocolVersion, sessionId, groupId, timestamp, responseId) {
-  return `notify.guru/v${protocolVersion}/response/${sessionId}/${groupId}/${timestamp}/${responseId}`;
+  return `opeco.link/v${protocolVersion}/response/${sessionId}/${groupId}/${timestamp}/${responseId}`;
 }
 
 async function sha256BytesHex(value) {

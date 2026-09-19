@@ -286,7 +286,7 @@ describe("web device-group cryptography", () => {
       ],
     };
     expect(groupKeyRegisterTranscript("group", "actor", body)).toBe([
-      "notify.guru/group-key-register/v1", "group", "actor", "group-key", "1", "2",
+      "opeco.link/group-key-register/v1", "group", "actor", "group-key", "1", "2",
       "device_a", "device_b", "2",
       "device_a", "ephemeral-a", "nonce-a", "cipher-a",
       "device_b", "ephemeral-b", "nonce-b", "cipher-b",
@@ -310,12 +310,12 @@ describe("web device-group cryptography", () => {
     const material = await crypto.subtle.importKey("raw", shared, "HKDF", false, ["deriveKey"]);
     const key = await crypto.subtle.deriveKey({
       name: "HKDF", hash: "SHA-256", salt: new Uint8Array(),
-      info: new TextEncoder().encode("notify.guru/attachment/v4\nsession\ngroup\n" + groupKey.timestamp + "\nresponse\nattachment"),
+      info: new TextEncoder().encode("opeco.link/attachment/v4\nsession\ngroup\n" + groupKey.timestamp + "\nresponse\nattachment"),
     }, material, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
     const plaintext = await crypto.subtle.decrypt({
       name: "AES-GCM", iv: fromBase64url(encrypted.manifest.nonce),
       additionalData: new TextEncoder().encode(
-        "notify.guru/v4/attachment/session/group/" + groupKey.timestamp + "/response/attachment",
+        "opeco.link/v4/attachment/session/group/" + groupKey.timestamp + "/response/attachment",
       ),
     }, key, encrypted.ciphertext);
     expect(new Uint8Array(plaintext)).toEqual(jpeg.bytes);
@@ -323,7 +323,7 @@ describe("web device-group cryptography", () => {
     await expect(crypto.subtle.decrypt({
       name: "AES-GCM", iv: fromBase64url(encrypted.manifest.nonce),
       additionalData: new TextEncoder().encode(
-        "notify.guru/v4/attachment/session/group/" + groupKey.timestamp + "/response/other",
+        "opeco.link/v4/attachment/session/group/" + groupKey.timestamp + "/response/other",
       ),
     }, key, encrypted.ciphertext)).rejects.toThrow();
   });

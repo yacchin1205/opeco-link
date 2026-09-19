@@ -11,8 +11,8 @@ The PWA is available at [opeco.link](https://opeco.link).
 Build the `opeco` CLI from source:
 
 ```sh
-git clone https://github.com/yacchin1205/notify-guru.git
-cd notify-guru
+git clone https://github.com/yacchin1205/opeco-link.git
+cd opeco-link
 go build -o opeco ./cmd/opeco
 ```
 

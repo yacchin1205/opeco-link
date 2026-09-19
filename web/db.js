@@ -1,4 +1,4 @@
-const DB_NAME = "notify.guru";
+const DB_NAME = "opeco.link";
 const DB_VERSION = 1;
 let databasePromise;
 

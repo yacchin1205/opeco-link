@@ -20,8 +20,8 @@ export default {
     try {
       const url = new URL(request.url);
       const requestHost = request.headers.get("host")?.split(":", 1)[0];
-      const miniflareLoopback = url.hostname === "notify.guru"
-        && request.headers.get("mf-original-hostname") === "notify.guru"
+      const miniflareLoopback = url.hostname === "opeco.link"
+        && request.headers.get("mf-original-hostname") === "opeco.link"
         && request.headers.get("cf-connecting-ip") === "127.0.0.1";
       const localRequest = miniflareLoopback
         || [url.hostname, requestHost].some((host) => host === "localhost" || host === "127.0.0.1");

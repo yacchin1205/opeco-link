@@ -43,7 +43,7 @@ func TestResolveColor(t *testing.T) {
 
 func TestJoinURLCarriesInitialColorInTheFragment(t *testing.T) {
 	t.Parallel()
-	api, err := NewAPI("https://notify.guru")
+	api, err := NewAPI("https://opeco.link")
 	if err != nil {
 		t.Fatal(err)
 	}

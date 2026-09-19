@@ -1253,7 +1253,7 @@ function sameTransitionMembers(left, right) {
 }
 
 function groupAbandonTranscript(groupId, actorDeviceId, headTransitionHash) {
-  return ["notify.guru/group-abandon/v1", groupId, actorDeviceId, headTransitionHash].join("\n");
+  return ["opeco.link/group-abandon/v1", groupId, actorDeviceId, headTransitionHash].join("\n");
 }
 
 function stringValue(value, field) {

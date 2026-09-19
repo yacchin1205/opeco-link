@@ -34,7 +34,7 @@ describe("session relay", () => {
   });
 
   it("rejects malformed JSON and unsafe cursors as protocol errors", async () => {
-    const malformed = await SELF.fetch("https://notify.guru/api/sessions", {
+    const malformed = await SELF.fetch("https://opeco.link/api/sessions", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: "{",
@@ -87,24 +87,24 @@ describe("session relay", () => {
   });
 
   it("redirects HTTP and instructs HTTPS clients to remain secure", async () => {
-    const redirected = await SELF.fetch(new Request("http://notify.guru/join?pairing=test", {
+    const redirected = await SELF.fetch(new Request("http://opeco.link/join?pairing=test", {
       redirect: "manual",
     }));
     expect(redirected.status).toBe(301);
-    expect(redirected.headers.get("location")).toBe("https://notify.guru/join?pairing=test");
+    expect(redirected.headers.get("location")).toBe("https://opeco.link/join?pairing=test");
 
-    const secure = await SELF.fetch("https://notify.guru/api/health");
+    const secure = await SELF.fetch("https://opeco.link/api/health");
     expect(secure.headers.get("strict-transport-security")).toBe("max-age=15552000");
   });
 
   it("associates only QR link paths with the iOS app", async () => {
-    const response = await SELF.fetch("https://notify.guru/.well-known/apple-app-site-association");
+    const response = await SELF.fetch("https://opeco.link/.well-known/apple-app-site-association");
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("application/json");
     expect(await response.json()).toEqual({
       applinks: {
         details: [{
-          appIDs: ["TDW896YLJ7.guru.notify.app"],
+          appIDs: ["TDW896YLJ7.link.opeco.app"],
           components: [{ "/": "/join" }, { "/": "/device" }],
         }],
       },
@@ -157,7 +157,7 @@ async function api(path: string, options: { method?: string; token?: string; bod
   const headers = new Headers();
   if (options.token !== undefined) headers.set("authorization", `Bearer ${options.token}`);
   if (options.body !== undefined) headers.set("content-type", "application/json");
-  const response = await SELF.fetch(`https://notify.guru${path}`, {
+  const response = await SELF.fetch(`https://opeco.link${path}`, {
     method: options.method ?? "GET",
     headers,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),

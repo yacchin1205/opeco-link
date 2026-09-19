@@ -1,4 +1,4 @@
-const CACHE_NAME = "opeco-shell-v19";
+const CACHE_NAME = "opeco-shell-v20";
 const SHELL = [
   "/", "/styles.css", "/app.js", "/manifest.webmanifest", "/icon.svg", "/favicon.svg", "/icon-192.png", "/icon-512.png",
   ...["outline", "blue", "cyan", "green", "orange", "red", "yellow", "purple", "pink"].map((name) => `/opeco/${name}.svg`),

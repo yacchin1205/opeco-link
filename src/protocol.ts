@@ -44,7 +44,7 @@ export interface SignedSessionDescriptor {
 
 export function sessionDescriptorTranscript(descriptor: Omit<SignedSessionDescriptor, "actorSignature" | "continuitySignature">): string {
   return [
-    "notify.guru/session-descriptor/v1",
+    "opeco.link/session-descriptor/v1",
     descriptor.sessionId,
     descriptor.groupId,
     String(descriptor.protocolVersion),
@@ -111,7 +111,7 @@ export function groupTransitionTranscript(groupId: string, transition: GroupTran
   const members = [...transition.members].sort((left, right) => compareCanonical(left.deviceId, right.deviceId));
   const packages = [...transition.packageDigests].sort((left, right) => compareCanonical(left.deviceId, right.deviceId));
   const lines = [
-    "notify.guru/group-transition/v1",
+    "opeco.link/group-transition/v1",
     groupId,
     transition.transitionId,
     transition.previousHash,
@@ -140,7 +140,7 @@ export async function groupTransitionHash(
   _continuitySignature?: string,
 ): Promise<string> {
   return sha256Text([
-    "notify.guru/group-transition-hash/v2",
+    "opeco.link/group-transition-hash/v2",
     groupTransitionTranscript(groupId, transition),
   ].join("\n"));
 }
@@ -152,7 +152,7 @@ export async function groupKeyPackageDigest(keyPackage: {
   ciphertext: string;
 }): Promise<string> {
   return sha256Text([
-    "notify.guru/group-key-package/v1",
+    "opeco.link/group-key-package/v1",
     keyPackage.deviceId,
     keyPackage.ephemeralPublicKey,
     keyPackage.nonce,
@@ -169,7 +169,7 @@ export async function deviceRequestBindingHash(request: {
   protocolVersion: number;
 }): Promise<string> {
   return sha256Text([
-    "notify.guru/device-request-binding/v1",
+    "opeco.link/device-request-binding/v1",
     request.requestId,
     request.deviceId,
     request.signingPublicKey,

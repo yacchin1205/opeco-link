@@ -243,7 +243,7 @@ export class DeviceGroup extends DurableObject<GroupEnv> {
       await this.requireManagementSignature(
         actor.device_id,
         actorSignature,
-        ["notify.guru/group-device-approve/v1", groupId, actor.device_id, request.requestId].join("\n"),
+        ["opeco.link/group-device-approve/v1", groupId, actor.device_id, request.requestId].join("\n"),
       );
       if (this.memberByRequest(request.requestId) === null) {
         if (request.protocolVersion < 4 && await this.hasActiveV4Sessions(groupId)) {
@@ -535,7 +535,7 @@ export class DeviceGroup extends DurableObject<GroupEnv> {
     const signature = stringField(body, "deviceSignature", BASE64URL, 128);
     const device = await this.registeredDevice(deviceId);
     const transcript = [
-      "notify.guru/group-create/v2",
+      "opeco.link/group-create/v2",
       groupId,
       deviceId,
       accessHash,
@@ -671,7 +671,7 @@ export class DeviceGroup extends DurableObject<GroupEnv> {
         await this.requireManagementSignature(
           actor.device_id,
           stringField(body, "actorSignature", BASE64URL, 128),
-          ["notify.guru/group-abandon/v1", meta.group_id, actor.device_id, headTransitionHash].join("\n"),
+          ["opeco.link/group-abandon/v1", meta.group_id, actor.device_id, headTransitionHash].join("\n"),
         );
         this.state.storage.sql.exec("DELETE FROM group_members_v3 WHERE device_id = ?", deviceId);
         await this.devices.deactivateGroupDevice(meta.group_id, deviceId);
@@ -713,7 +713,7 @@ export class DeviceGroup extends DurableObject<GroupEnv> {
     await this.requireManagementSignature(
       actor.device_id,
       stringField(body, "actorSignature", BASE64URL, 128),
-      ["notify.guru/group-device-remove/v1", meta.group_id, actor.device_id, deviceId].join("\n"),
+      ["opeco.link/group-device-remove/v1", meta.group_id, actor.device_id, deviceId].join("\n"),
     );
     if (this.member(deviceId) === null) {
       throw new HttpError(404, "device_not_found", "Active device not found");
@@ -1376,7 +1376,7 @@ function groupKeyTranscript(
     return item;
   });
   const lines = [
-    "notify.guru/group-key-register/v1",
+    "opeco.link/group-key-register/v1",
     groupId,
     actorDeviceId,
     publicKey,

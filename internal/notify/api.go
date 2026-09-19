@@ -31,7 +31,7 @@ type transientAPIError struct {
 }
 
 func (e *APIError) Error() string {
-	return fmt.Sprintf("notify.guru API: %s (%d): %s", e.Code, e.Status, e.Message)
+	return fmt.Sprintf("opeco.link API: %s (%d): %s", e.Code, e.Status, e.Message)
 }
 
 func (e *transientAPIError) Error() string {

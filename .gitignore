@@ -6,7 +6,7 @@ dist/
 coverage/
 playwright-report/
 test-results/
-/notifyg
+/opeco
 /TODO.md
 /ios/*.xcodeproj/xcuserdata/
 *.xcuserstate
