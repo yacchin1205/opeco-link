@@ -147,7 +147,7 @@ export class Session extends DurableObject<SessionEnv> {
       keyId: env.APNS_KEY_ID,
       teamId: env.APNS_TEAM_ID,
       privateKey: env.APNS_PRIVATE_KEY,
-      topic: "guru.notify.app",
+      topic: "link.opeco.app",
     });
     this.state.blockConcurrencyWhile(async () => {
       if ((await this.state.storage.get<boolean>(INITIALIZED_KEY)) === true) this.createSchema();
@@ -1461,7 +1461,7 @@ async function sessionJoinHash(
   proof: string,
 ): Promise<string> {
   return sha256Hex([
-    "notify.guru/session-join-operation/v1",
+    "opeco.link/session-join-operation/v1",
     sessionId,
     pairingId,
     groupId,

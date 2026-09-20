@@ -55,14 +55,15 @@ import {
 import { expiredSessionIDs } from "./expiry.js";
 import { qrMatrix } from "./qr.js";
 import { relativeTime } from "./relative-time.js";
+import { opecoPalette } from "./opeco-palette.js";
 
 const cardsElement = document.querySelector("#cards");
 const emptyElement = document.querySelector("#empty");
 const messageElement = document.querySelector("#message");
 const connectionElement = document.querySelector("#connection-state");
 const cardTemplate = document.querySelector("#card-template");
-const deviceSummaryElement = document.querySelector("#device-summary");
-const deviceSummaryTitleElement = document.querySelector("#device-summary-title");
+const deviceManagementButton = document.querySelector("#open-device-management");
+const deviceCountElement = document.querySelector("#device-count");
 const deviceManagementElement = document.querySelector("#device-management");
 const groupStatusElement = document.querySelector("#group-status");
 const groupKeyTimeElement = document.querySelector("#group-key-time");
@@ -88,9 +89,10 @@ let stateActionInProgress = false;
 let requestURL;
 let pendingDeviceRequest = null;
 let sessionRenderSignature = "";
+let groupMembersRenderSignature = "";
 
 window.addEventListener("unhandledrejection", (event) => showError(event.reason));
-document.querySelector("#open-device-management").addEventListener("click", () => setDeviceManagement(true));
+deviceManagementButton.addEventListener("click", () => setDeviceManagement(true));
 document.querySelector("#close-device-management").addEventListener("click", () => setDeviceManagement(false));
 requestSharingButton.addEventListener("click", () => beginDeviceRequest().catch(showError));
 shareRequestButton.addEventListener("click", () => shareDeviceRequest().catch(showError));
@@ -120,7 +122,7 @@ async function identityOrCreate() {
   const current = await getIdentity();
   if (current !== undefined) {
     if (current.protocolVersion !== 3 && current.protocolVersion !== 4) {
-      throw new LegacyProtocolError("このブラウザに保存されているnotify.guruのデータを読み込めません。");
+      throw new LegacyProtocolError("このブラウザに保存されているopecoのデータを読み込めません。");
     }
     current.protocolVersion = 4;
     if (current.group !== null && (current.group.rootTransitionHash === undefined || current.group.headTransitionHash === undefined)) {
@@ -858,16 +860,21 @@ async function recoverRemovedDevice() {
 async function renderGroup() {
   const waiting = pendingDeviceRequest !== null;
   waitingElement.hidden = !waiting;
-  deviceSummaryElement.hidden = waiting || identity.group === null || managingDevices;
+  deviceManagementButton.disabled = waiting || identity.group === null;
   deviceManagementElement.hidden = waiting || identity.group === null || !managingDevices;
   if (waiting) showDeviceRequest(pendingDeviceRequest);
   if (identity.group === null || groupState === undefined) return;
   const sharing = groupState.members.length > 1;
-  deviceSummaryTitleElement.textContent = sharing ? `${groupState.members.length}台で通知を共有中` : "共有なし";
+  deviceCountElement.hidden = !sharing;
+  deviceCountElement.textContent = String(groupState.members.length);
+  deviceManagementButton.setAttribute("aria-label", `デバイスグループの管理（${groupState.members.length}台）`);
   groupStatusElement.textContent = sharing ? `${groupState.members.length}台で通知を共有しています。` : "現在はこのデバイスだけで通知を受け取ります。";
   const current = groupState.keys.at(-1) ?? null;
   groupKeyTimeElement.textContent = current === null ? "利用可能な鍵なし" : `鍵 ${new Date(current.timestamp).toLocaleString()}`;
   leaveButton.hidden = !sharing;
+  const signature = JSON.stringify(groupState.members.map((member) => member.deviceId));
+  if (signature === groupMembersRenderSignature) return;
+  groupMembersRenderSignature = signature;
   groupDevicesElement.replaceChildren();
   for (const member of groupState.members) {
     const row = document.createElement("div");
@@ -878,7 +885,10 @@ async function renderGroup() {
     if (member.deviceId !== identity.deviceId) {
       const button = document.createElement("button");
       button.type = "button";
-      button.textContent = "グループから除外";
+      button.className = "icon-button destructive";
+      button.setAttribute("aria-label", `デバイス ${member.deviceId.slice(0, 8)} をグループから除外`);
+      button.title = "グループから除外";
+      button.append(document.querySelector("#remove-device-icon").content.cloneNode(true));
       button.addEventListener("click", () => removeGroupDevice(member.deviceId).catch(showError));
       row.append(button);
     }
@@ -896,6 +906,7 @@ async function render() {
   for (const session of sessions) {
     const card = cardTemplate.content.firstElementChild.cloneNode(true);
     if (session.color !== null && session.color !== undefined) card.style.setProperty("--session-color", colorValue(session.color));
+    card.querySelector(".session-opeco").src = `/opeco/${opecoPalette(session.color)}.svg`;
     card.querySelector(".session-title").textContent = session.title;
     card.querySelector(".expiry").textContent = expiryText(session.expiresAt);
     const sessionTime = card.querySelector(".session-time");
@@ -1242,7 +1253,7 @@ function sameTransitionMembers(left, right) {
 }
 
 function groupAbandonTranscript(groupId, actorDeviceId, headTransitionHash) {
-  return ["notify.guru/group-abandon/v1", groupId, actorDeviceId, headTransitionHash].join("\n");
+  return ["opeco.link/group-abandon/v1", groupId, actorDeviceId, headTransitionHash].join("\n");
 }
 
 function stringValue(value, field) {
@@ -1254,11 +1265,13 @@ function setDeviceManagement(enabled) {
   managingDevices = enabled;
   document.body.classList.toggle("managing-devices", enabled);
   renderGroup().catch(showError);
+  if (enabled) document.querySelector("#close-device-management").focus();
+  else deviceManagementButton.focus();
 }
 
 async function shareDeviceRequest() {
   if (requestURL === undefined) throw new Error("有効な追加用リンクがありません");
-  if (navigator.share !== undefined) await navigator.share({ title: "notify.guru device group", url: requestURL });
+  if (navigator.share !== undefined) await navigator.share({ title: "opeco device group", url: requestURL });
   else {
     await navigator.clipboard.writeText(requestURL);
     messageElement.textContent = "追加用リンクをコピーしました。";

@@ -1,8 +1,16 @@
 :root {
-  color-scheme: dark;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: #070a10;
-  color: #f8fafc;
+  color-scheme: only light;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --background: #f2f2f7;
+  --surface: #fff;
+  --text: #1c1c1e;
+  --secondary: #62626a;
+  --accent: #087da8;
+  --line: #d6d6dc;
+  --session-tint: 75%;
+  --danger: #c52d2d;
+  background: var(--background);
+  color: var(--text);
   font-synthesis: none;
 }
 
@@ -13,81 +21,86 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background:
-    radial-gradient(circle at 15% 0%, rgba(56, 189, 248, 0.13), transparent 32rem),
-    radial-gradient(circle at 100% 20%, rgba(167, 139, 250, 0.11), transparent 30rem),
-    #070a10;
+  background: var(--background);
 }
 
 header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: max(1.25rem, env(safe-area-inset-top)) max(1.25rem, env(safe-area-inset-right)) 1rem max(1.25rem, env(safe-area-inset-left));
-  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
-}
-
-.brand {
-  color: inherit;
-  font-size: 1.05rem;
-  font-weight: 750;
-  letter-spacing: -0.03em;
-  text-decoration: none;
+  width: 100%;
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) 0 max(1rem, env(safe-area-inset-left));
 }
 
 #connection-state {
-  color: #94a3b8;
+  color: var(--secondary);
   font-size: 0.78rem;
 }
 
-main {
-  width: min(48rem, 100%);
-  margin: 0 auto;
-  padding: 4rem 1.25rem calc(4rem + env(safe-area-inset-bottom));
+.brand, .header-actions {
+  display: flex;
+  align-items: center;
 }
 
-.eyebrow,
+.brand {
+  gap: 6px;
+  color: var(--text);
+  font-size: 1.5rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.brand img {
+  width: auto;
+  height: 2.75rem;
+  object-fit: contain;
+  opacity: 0.6;
+}
+
+.header-actions {
+  gap: 12px;
+}
+
+main {
+  width: 100%;
+  padding: 1rem max(1rem, env(safe-area-inset-right)) calc(2rem + env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+}
+
 .card-label {
   margin: 0 0 0.55rem;
-  color: #38bdf8;
+  color: var(--accent);
   font-size: 0.68rem;
   font-weight: 750;
   letter-spacing: 0.18em;
 }
 
-h1 {
-  margin: 0;
-  font-size: clamp(2.35rem, 9vw, 4.8rem);
-  line-height: 0.96;
-  letter-spacing: -0.065em;
-}
-
-#intro > p:last-child {
-  max-width: 34rem;
-  margin: 1.5rem 0 0;
-  color: #94a3b8;
-  line-height: 1.75;
-}
-
 #message {
-  min-height: 1.5rem;
-  margin: 2rem 0 0;
-  color: #fbbf24;
+  margin: 0 0 1rem;
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+
+#message:empty {
+  display: none;
 }
 
 #cards {
   display: grid;
   gap: 1rem;
-  margin-top: 1rem;
+  align-items: start;
 }
 
 .group-card {
   margin-top: 1rem;
   padding: 1.35rem;
   overflow-wrap: anywhere;
-  border: 1px solid rgba(56, 189, 248, 0.25);
+  border: 1px solid var(--line);
   border-radius: 1.15rem;
-  background: rgba(8, 47, 73, 0.28);
+  background: var(--surface);
+  max-width: 42rem;
+  margin-inline: auto;
+  line-height: 1.6;
 }
 
 .error-card {
@@ -104,18 +117,16 @@ h1 {
   font-size: 1.15rem;
 }
 
-body.managing-devices #intro,
-body.managing-devices #device-summary,
 body.managing-devices #join-device,
 body.managing-devices #cards,
 body.managing-devices #empty {
   display: none;
 }
 
-#invitation {
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid rgba(148, 163, 184, 0.16);
+hr {
+  margin: 1.25rem 0;
+  border: 0;
+  border-top: 1px solid var(--line);
 }
 
 #invitation-qr {
@@ -130,8 +141,17 @@ body.managing-devices #empty {
   border-radius: 0.75rem;
 }
 
-#pending-devices section,
 #group-devices {
+  margin-top: 0.75rem;
+}
+
+#group-key-time, #group-status {
+  color: var(--secondary);
+  font-size: 0.8rem;
+}
+
+#leave-device-group {
+  display: block;
   margin-top: 1rem;
 }
 
@@ -141,7 +161,7 @@ body.managing-devices #empty {
   justify-content: space-between;
   gap: 1rem;
   min-height: 3.5rem;
-  border-top: 1px solid rgba(148, 163, 184, 0.16);
+  border-bottom: 1px solid var(--line);
 }
 
 .verification-code {
@@ -153,14 +173,51 @@ body.managing-devices #empty {
 }
 
 .card {
-  padding: 1.35rem;
-  overflow: hidden;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 1.15rem;
-  background: rgba(15, 23, 42, 0.76);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--session-color, #cdeff2) 24%, #0f172a), rgba(15, 23, 42, 0.82));
-  box-shadow: 0 1rem 4rem rgba(0, 0, 0, 0.2);
-  backdrop-filter: blur(1rem);
+  --opeco-size: 1.125rem;
+  display: flex;
+  align-items: flex-start;
+  gap: calc(var(--opeco-size) * 0.2);
+  min-width: 0;
+}
+
+.session-opeco {
+  flex: none;
+  width: calc(var(--opeco-size) * 2.5);
+  height: calc(var(--opeco-size) * 2.5);
+  object-fit: contain;
+  margin-top: 0.9375rem;
+}
+
+.session-panel {
+  --panel: color-mix(in srgb, var(--session-color, var(--surface)) var(--session-tint), var(--background));
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  margin-left: 10px;
+  padding: 1.125rem;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--panel);
+  overflow-wrap: anywhere;
+}
+
+.session-panel::before, .session-panel::after {
+  content: "";
+  position: absolute;
+  top: calc(0.9375rem + var(--opeco-size) * 1.25 - 8px);
+  width: 11px;
+  height: 16px;
+  clip-path: polygon(100% 0, 0 50%, 100% 100%);
+}
+
+.session-panel::before {
+  left: -11px;
+  background: var(--line);
+}
+
+.session-panel::after {
+  left: -9px;
+  background: var(--panel);
 }
 
 .feedback {
@@ -181,7 +238,7 @@ body.managing-devices #empty {
 .feedback-form label {
   display: grid;
   gap: 0.5rem;
-  color: #bae6fd;
+  color: var(--secondary);
   font-size: 0.85rem;
 }
 
@@ -190,10 +247,10 @@ body.managing-devices #empty {
   width: 100%;
   min-height: 5rem;
   padding: 0.75rem;
-  border: 1px solid rgba(56, 189, 248, 0.38);
+  border: 1px solid var(--line);
   border-radius: 0.75rem;
-  background: rgba(15, 23, 42, 0.72);
-  color: #f8fafc;
+  background: var(--surface);
+  color: var(--text);
   font: inherit;
   resize: vertical;
 }
@@ -211,12 +268,14 @@ body.managing-devices #empty {
 }
 
 .feedback-image {
-  color: #f8fafc;
+  max-width: 100%;
+  color: var(--text);
   font: inherit;
 }
 
 .feedback-actions {
   display: flex;
+  align-items: start;
   gap: 0.65rem;
   margin-top: 0.75rem;
 }
@@ -233,7 +292,7 @@ body.managing-devices #empty {
 }
 
 .expiry {
-  color: #64748b;
+  color: var(--secondary);
   font-size: 0.72rem;
   white-space: nowrap;
 }
@@ -248,8 +307,8 @@ body.managing-devices #empty {
   min-width: 1.5rem;
   padding: 0.15rem 0.45rem;
   border-radius: 999px;
-  background: #38bdf8;
-  color: #082f49;
+  background: var(--accent);
+  color: white;
   font-size: 0.72rem;
   font-weight: 800;
   line-height: 1.2;
@@ -257,7 +316,7 @@ body.managing-devices #empty {
 }
 
 .relative-time {
-  color: #94a3b8;
+  color: var(--secondary);
   font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -265,7 +324,7 @@ body.managing-devices #empty {
 
 .status {
   margin: 1.2rem 0 0;
-  color: #7dd3fc;
+  color: var(--secondary);
   font-size: 0.85rem;
 }
 
@@ -301,7 +360,7 @@ body.managing-devices #empty {
 .request {
   margin-top: 1.25rem;
   padding-top: 1.1rem;
-  border-top: 1px solid rgba(148, 163, 184, 0.16);
+  border-top: 1px solid var(--line);
 }
 
 .request-prompt {
@@ -323,7 +382,7 @@ button.dismiss-item {
   padding: 0;
   border-color: transparent;
   background: transparent;
-  color: #94a3b8;
+  color: var(--secondary);
   font-size: 1.25rem;
 }
 
@@ -337,10 +396,10 @@ button.dismiss-item {
 button {
   min-height: 2.75rem;
   padding: 0.6rem 1rem;
-  border: 1px solid rgba(56, 189, 248, 0.38);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
   border-radius: 999px;
-  background: rgba(14, 165, 233, 0.1);
-  color: #e0f2fe;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  color: var(--accent);
   font: inherit;
   font-weight: 650;
   cursor: pointer;
@@ -353,36 +412,112 @@ button:disabled {
 
 button.destructive {
   margin-top: 1.25rem;
-  border-color: rgba(248, 113, 113, 0.45);
-  background: rgba(127, 29, 29, 0.2);
-  color: #fecaca;
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  color: var(--danger);
+}
+
+button.icon-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--surface);
+}
+
+.icon-button svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.device-row .destructive {
+  margin-top: 0;
+}
+
+#device-count {
+  position: absolute;
+  right: -2px;
+  top: -2px;
+  min-width: 1rem;
+  height: 1rem;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: #6b6b73;
+  color: #fff;
+  font-size: 0.5625rem;
+  line-height: 1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+button:focus-visible, a:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
 #empty {
   margin-top: 2rem;
   padding: 3rem 1rem;
-  border: 1px dashed rgba(148, 163, 184, 0.22);
-  border-radius: 1rem;
-  color: #64748b;
+  color: var(--secondary);
   text-align: center;
 }
 
 .empty-mark {
-  font-size: 2.5rem;
+  width: 128px;
+  height: 128px;
+  margin: 0 auto 0.75rem;
+  background: #888;
+  mask: url("/opeco/outline.svg") center / contain no-repeat;
+}
+
+#empty h2 {
+  color: var(--text);
+  font-size: 1.25rem;
+}
+
+#empty p {
+  max-width: 28rem;
+  margin-inline: auto;
+  line-height: 1.6;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+@media (min-width: 600px) {
+  #cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 600px) and (orientation: landscape) {
+  #cards {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 36rem) {
-  main {
-    padding-top: 3rem;
+  .card .card-head {
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
 
-  .card-head {
-    display: block;
-  }
-
-  .expiry {
-    display: block;
-    margin-top: 0.5rem;
+  .card-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
 }
 

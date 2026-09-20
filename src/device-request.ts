@@ -126,7 +126,7 @@ export class DeviceRequest extends DurableObject<DeviceRequestEnv> {
     if (deviceId !== initial.device_id) {
       throw new HttpError(403, "wrong_device", "Device request belongs to another device");
     }
-    const transcript = ["notify.guru/device-request-read/v1", initial.request_id, deviceId].join("\n");
+    const transcript = ["opeco.link/device-request-read/v1", initial.request_id, deviceId].join("\n");
     if (!(await verifyP256Signature(initial.signing_public_key, bearerToken(request), transcript))) {
       throw new HttpError(401, "invalid_device_signature", "Device request signature is invalid");
     }

@@ -16,7 +16,7 @@ describe("APNs client", () => {
         keyId: "ABCDEFGHIJ",
         teamId: "0123456789",
         privateKey,
-        topic: "guru.notify.app",
+        topic: "link.opeco.app",
       },
       transport,
     );
@@ -26,7 +26,7 @@ describe("APNs client", () => {
     expect(receivedInit?.headers).toMatchObject({
       "apns-push-type": "alert",
       "apns-priority": "10",
-      "apns-topic": "guru.notify.app",
+      "apns-topic": "link.opeco.app",
     });
     expect(JSON.parse(String(receivedInit?.body))).toEqual({
       aps: { alert: "A new notification is available.", sound: "default" },
@@ -41,7 +41,7 @@ describe("APNs client", () => {
     const privateKey = await signingKey();
     let body: unknown;
     const client = new APNsClient(
-      { keyId: "REQUEST001", teamId: "REQUEST002", privateKey, topic: "guru.notify.app" },
+      { keyId: "REQUEST001", teamId: "REQUEST002", privateKey, topic: "link.opeco.app" },
       (async (_input: RequestInfo | URL, init?: RequestInit) => {
         body = JSON.parse(String(init?.body));
         return new Response(null, { status: 200 });
@@ -56,7 +56,7 @@ describe("APNs client", () => {
     const privateKey = await signingKey();
     let init: RequestInit | undefined;
     const client = new APNsClient(
-      { keyId: "STATUSKEY1", teamId: "STATUSTEAM", privateKey, topic: "guru.notify.app" },
+      { keyId: "STATUSKEY1", teamId: "STATUSTEAM", privateKey, topic: "link.opeco.app" },
       (async (_input: RequestInfo | URL, requestInit?: RequestInit) => {
         init = requestInit;
         return new Response(null, { status: 200 });
@@ -72,7 +72,7 @@ describe("APNs client", () => {
     const privateKey = await signingKey();
     const bodies: unknown[] = [];
     const client = new APNsClient(
-      { keyId: "BADGEKEY01", teamId: "BADGETEAM1", privateKey, topic: "guru.notify.app" },
+      { keyId: "BADGEKEY01", teamId: "BADGETEAM1", privateKey, topic: "link.opeco.app" },
       (async (_input: RequestInfo | URL, init?: RequestInit) => {
         bodies.push(JSON.parse(String(init?.body)));
         return new Response(null, { status: 200 });
@@ -99,7 +99,7 @@ describe("APNs client", () => {
       keyId: "CACHEKEY01",
       teamId: "CACHETEA01",
       privateKey,
-      topic: "guru.notify.app",
+      topic: "link.opeco.app",
     };
 
     await Promise.all([
@@ -122,7 +122,7 @@ describe("APNs client", () => {
         return new Response(null, { status: 200 });
       }) as typeof fetch;
       const client = new APNsClient(
-        { keyId: "REFRESH001", teamId: "REFRESH002", privateKey, topic: "guru.notify.app" },
+        { keyId: "REFRESH001", teamId: "REFRESH002", privateKey, topic: "link.opeco.app" },
         transport,
       );
 
@@ -142,15 +142,15 @@ describe("APNs client", () => {
   it("classifies invalid, permanent, and retryable provider responses", async () => {
     const privateKey = await signingKey();
     const invalid = new APNsClient(
-      { keyId: "INVALID001", teamId: "INVALID002", privateKey, topic: "guru.notify.app" },
+      { keyId: "INVALID001", teamId: "INVALID002", privateKey, topic: "link.opeco.app" },
       (async () => Response.json({ reason: "Unregistered", timestamp: 1 }, { status: 410 })) as typeof fetch,
     );
     const providerFailure = new APNsClient(
-      { keyId: "PERMANENT1", teamId: "PERMANENT2", privateKey, topic: "guru.notify.app" },
+      { keyId: "PERMANENT1", teamId: "PERMANENT2", privateKey, topic: "link.opeco.app" },
       (async () => Response.json({ reason: "BadTopic" }, { status: 400 })) as typeof fetch,
     );
     const retryable = new APNsClient(
-      { keyId: "RETRYABLE1", teamId: "RETRYABLE2", privateKey, topic: "guru.notify.app" },
+      { keyId: "RETRYABLE1", teamId: "RETRYABLE2", privateKey, topic: "link.opeco.app" },
       (async () => Response.json({ reason: "ServiceUnavailable" }, { status: 503 })) as typeof fetch,
     );
 
@@ -172,13 +172,13 @@ describe("APNs client", () => {
   it("distinguishes retryable transport failures from configuration errors", async () => {
     const privateKey = await signingKey();
     const transportFailure = new APNsClient(
-      { keyId: "NETWORK001", teamId: "NETWORK002", privateKey, topic: "guru.notify.app" },
+      { keyId: "NETWORK001", teamId: "NETWORK002", privateKey, topic: "link.opeco.app" },
       (async () => { throw new TypeError("network unavailable"); }) as typeof fetch,
     );
     await expect(transportFailure.send("aabb", "production", "notify")).rejects.toBeInstanceOf(APNsTransportError);
 
     const invalidConfiguration = new APNsClient(
-      { keyId: "invalid", teamId: "NETWORK002", privateKey, topic: "guru.notify.app" },
+      { keyId: "invalid", teamId: "NETWORK002", privateKey, topic: "link.opeco.app" },
     );
     await expect(invalidConfiguration.send("aabb", "production", "notify")).rejects.toThrow(
       "APNS_KEY_ID must be a 10-character uppercase identifier",

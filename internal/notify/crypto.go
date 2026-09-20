@@ -40,7 +40,7 @@ func deriveGroupKey(
 	sessionID, groupID string,
 	timestamp int64,
 ) ([]byte, error) {
-	info := fmt.Sprintf("notify.guru/session/v%d\n%s\n%s\n%d", protocolVersion, sessionID, groupID, timestamp)
+	info := fmt.Sprintf("opeco.link/session/v%d\n%s\n%s\n%d", protocolVersion, sessionID, groupID, timestamp)
 	return deriveECDHKey(privateKey, encodedPublicKey, info)
 }
 
@@ -50,7 +50,7 @@ func deriveAttachmentKey(
 	timestamp int64,
 ) ([]byte, error) {
 	info := fmt.Sprintf(
-		"notify.guru/attachment/v4\n%s\n%s\n%d\n%s\n%s",
+		"opeco.link/attachment/v4\n%s\n%s\n%d\n%s\n%s",
 		sessionID,
 		groupID,
 		timestamp,
@@ -112,7 +112,7 @@ func groupTransitionTranscript(groupID string, transition signedGroupTransition)
 	sort.Slice(members, func(i, j int) bool { return members[i].DeviceID < members[j].DeviceID })
 	sort.Slice(digests, func(i, j int) bool { return digests[i].DeviceID < digests[j].DeviceID })
 	lines := []string{
-		"notify.guru/group-transition/v1", groupID, transition.TransitionID, transition.PreviousHash,
+		"opeco.link/group-transition/v1", groupID, transition.TransitionID, transition.PreviousHash,
 		fmt.Sprint(transition.Timestamp), transition.ActorDeviceID, transition.PublicKey,
 		map[bool]string{true: "1", false: "0"}[transition.Recreated], fmt.Sprint(len(members)),
 	}
@@ -128,7 +128,7 @@ func groupTransitionTranscript(groupID string, transition signedGroupTransition)
 
 func groupTransitionHash(groupID string, transition signedGroupTransition) string {
 	value := strings.Join([]string{
-		"notify.guru/group-transition-hash/v2", groupTransitionTranscript(groupID, transition),
+		"opeco.link/group-transition-hash/v2", groupTransitionTranscript(groupID, transition),
 	}, "\n")
 	digest := sha256.Sum256([]byte(value))
 	return hex.EncodeToString(digest[:])

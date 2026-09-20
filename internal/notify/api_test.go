@@ -63,7 +63,7 @@ func TestAPIClassifiesAnInvalidErrorResponseByItsHTTPStatus(t *testing.T) {
 		{status: 503, want: true},
 		{status: 400, want: false},
 	} {
-		api, err := NewAPI("https://notify.guru")
+		api, err := NewAPI("https://opeco.link")
 		if err != nil {
 			t.Fatal(err)
 		}

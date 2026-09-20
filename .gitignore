@@ -4,7 +4,9 @@ node_modules/
 .web-dist/
 dist/
 coverage/
-/notifyg
+playwright-report/
+test-results/
+/opeco
 /TODO.md
 /ios/*.xcodeproj/xcuserdata/
 *.xcuserstate

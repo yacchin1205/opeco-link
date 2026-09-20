@@ -28,7 +28,7 @@ jobs:
   integration:
     runs-on: ubuntu-24.04
     env:
-      NOTIFY_INTEGRATION_BASE_URL: http://127.0.0.1:8787
+      OPECO_INTEGRATION_BASE_URL: http://127.0.0.1:8787
       WRANGLER_SEND_METRICS: "false"
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -46,7 +46,7 @@ jobs:
       - name: Start the local worker
         run: |
           npm run dev -- --ip 127.0.0.1 --port 8787 > wrangler.log 2>&1 &
-          curl -sSf --retry 60 --retry-delay 2 --retry-all-errors --retry-connrefused "$NOTIFY_INTEGRATION_BASE_URL/api/health"
+          curl -sSf --retry 60 --retry-delay 2 --retry-all-errors --retry-connrefused "$OPECO_INTEGRATION_BASE_URL/api/health"
       - run: go test -count=1 -tags integration ./internal/notify
       - if: always()
         run: cat wrangler.log
@@ -62,7 +62,22 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
       - run: npm run check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: web-e2e-results
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14
 
   apple-test:
     runs-on: macos-26
@@ -74,12 +89,12 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - run: scripts/test-all.sh "${{ matrix.suite }}"
         env:
-          TEST_RESULTS_DIR: ${{ runner.temp }}/notify-guru-test-results
+          TEST_RESULTS_DIR: ${{ runner.temp }}/opeco-link-test-results
       - if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: test-results-${{ matrix.suite }}
-          path: ${{ runner.temp }}/notify-guru-test-results
+          path: ${{ runner.temp }}/opeco-link-test-results
           if-no-files-found: error
           retention-days: 14
 
@@ -104,7 +119,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: notifyg
+          name: opeco
           path: |
             dist/*.tar.gz
             dist/*.zip

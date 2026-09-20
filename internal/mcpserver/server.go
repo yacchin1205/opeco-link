@@ -7,10 +7,10 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"notify.guru/internal/notify"
+	"opeco.link/internal/notify"
 )
 
-const instructions = "Call session_create for the work the user wants to follow; it returns the session this process is already running when there is one, so an agent never manages more than one session and never asks for a second QR code. Add a device with session_pairing_create, and start a separate session only by closing the running one first, at the user's request. Ask the user to open the returned local QR image URL in a browser when the browser runs on the same machine as notifyg; otherwise give them the pairing URL. Do not claim a device is paired until session_wait_for_device confirms it, and do not send events before that. Send status and notifications as work changes. Every send result may carry responses from devices, including messages the user wrote without being asked; read that field every time, because responses are handed over once and nothing else will surface them. A request may have multiple choices. Forward every response to the agent; notify.guru does not select or aggregate responses. Close a session only when immediate removal is intended; normal process exit leaves it to expire."
+const instructions = "Call session_create for the work the user wants to follow; it returns the session this process is already running when there is one, so an agent never manages more than one session and never asks for a second QR code. Add a device with session_pairing_create, and start a separate session only by closing the running one first, at the user's request. Ask the user to open the returned local QR image URL in a browser when the browser runs on the same machine as opeco; otherwise give them the pairing URL. Do not claim a device is paired until session_wait_for_device confirms it, and do not send events before that. Send status and notifications as work changes. Every send result may carry responses from devices, including messages the user wrote without being asked; read that field every time, because responses are handed over once and nothing else will surface them. A request may have multiple choices. Forward every response to the agent; opeco does not select or aggregate responses. Close a session only when immediate removal is intended; normal process exit leaves it to expire."
 
 type Server struct {
 	store  *notify.Store
@@ -23,11 +23,11 @@ func New(store *notify.Store, viewer *notify.QRViewer) *Server {
 
 func (s *Server) Run(ctx context.Context) error {
 	server := mcp.NewServer(&mcp.Implementation{
-		Name:        "notify-guru",
-		Title:       "notify.guru",
+		Name:        "opeco-link",
+		Title:       "opeco.link",
 		Description: "Ephemeral encrypted notifications between agent sessions and device groups",
 		Version:     "0.1.0",
-		WebsiteURL:  "https://notify.guru",
+		WebsiteURL:  "https://opeco.link",
 	}, &mcp.ServerOptions{Instructions: instructions})
 
 	mcp.AddTool(server, &mcp.Tool{
@@ -93,7 +93,7 @@ type createInput struct {
 }
 
 // pairingOutput deliberately omits the terminal QR code. The MCP result passes
-// through an agent's rendering before a person sees it, and neither notifyg nor
+// through an agent's rendering before a person sees it, and neither opeco nor
 // the agent can inspect the result, so a block-character QR cannot be trusted to
 // stay scannable. Callers show the loopback image, or the pairing URL when the
 // browser is not on this machine.
@@ -287,7 +287,7 @@ func attachmentContent(responses []notify.Response) *mcp.CallToolResult {
 				URI:         attachment.URI,
 				Name:        attachment.ID + ".jpg",
 				Title:       fmt.Sprintf("Photo %d attached to response %s", i+1, response.ID),
-				Description: "End-to-end encrypted attachment decrypted by notifyg into a local temporary file",
+				Description: "End-to-end encrypted attachment decrypted by opeco into a local temporary file",
 				MIMEType:    attachment.MediaType,
 				Size:        &size,
 			})

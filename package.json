@@ -1,5 +1,5 @@
 {
-  "name": "notify.guru",
+  "name": "opeco.link",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,8 +11,10 @@
     "predev": "npm run build:web",
     "pretest": "npm run build:web",
     "test": "vitest run",
+    "pretest:e2e": "go build -o .wrangler/e2e/opeco ./cmd/opeco",
+    "test:e2e": "playwright test",
     "test:all": "scripts/test-all.sh",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc -p e2e/tsconfig.json"
   },
   "dependencies": {
     "qrcode-generator": "2.0.4"
@@ -20,9 +22,12 @@
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.1.0",
     "@cloudflare/workers-types": "^5.20260826.1",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.2",
     "esbuild": "^0.28.1",
     "typescript": "^7.0.2",
     "vitest": "^4.1.11",
-    "wrangler": "^4.126.0"
+    "wrangler": "^4.129.1"
   }
 }

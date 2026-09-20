@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "notify-guru",
+  "name": "opeco-link",
   "main": "src/worker.ts",
   "compatibility_date": "2026-08-26",
   "workers_dev": true,
@@ -9,7 +9,7 @@
   },
   "routes": [
     {
-      "pattern": "notify.guru",
+      "pattern": "opeco.link",
       "custom_domain": true
     }
   ],
@@ -22,7 +22,7 @@
   "r2_buckets": [
     {
       "binding": "ATTACHMENTS",
-      "bucket_name": "notify-guru-attachments"
+      "bucket_name": "opeco-link-attachments"
     }
   ],
   "durable_objects": {

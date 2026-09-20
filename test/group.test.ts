@@ -7,7 +7,7 @@ describe("devices and persistent groups", () => {
   it("registers a device and accepts push updates only with its signature", async () => {
     const device = await newDevice();
     const token = "ab".repeat(32);
-    const transcript = ["notify.guru/device-push/v1", device.id, token, "sandbox"].join("\n");
+    const transcript = ["opeco.link/device-push/v1", device.id, token, "sandbox"].join("\n");
     const updated = await api(`/api/devices/${device.id}/push`, {
       method: "PUT",
       body: { token, environment: "sandbox", signature: await sign(device.signingKey, transcript) },
@@ -337,7 +337,7 @@ describe("devices and persistent groups", () => {
         })).json.responses).toEqual([]);
       }
 
-      const uploaded = await SELF.fetch(`https://notify.guru/api/sessions/${session.id}/attachments/${attachmentId}`, {
+      const uploaded = await SELF.fetch(`https://opeco.link/api/sessions/${session.id}/attachments/${attachmentId}`, {
         method: "PUT",
         headers: {
           authorization: `Bearer ${reserved.json.uploadToken}`,
@@ -377,7 +377,7 @@ describe("devices and persistent groups", () => {
 
     for (const attachmentId of attachmentIds) {
       const downloaded = await SELF.fetch(
-        `https://notify.guru/api/sessions/${session.id}/attachments/${attachmentId}`,
+        `https://opeco.link/api/sessions/${session.id}/attachments/${attachmentId}`,
         { headers: { authorization: `Bearer ${session.sessionToken}` } },
       );
       expect(downloaded.status).toBe(200);
@@ -393,7 +393,7 @@ describe("devices and persistent groups", () => {
     })).status).toBe(200);
     for (const attachmentId of attachmentIds) {
       expect((await SELF.fetch(
-        `https://notify.guru/api/sessions/${session.id}/attachments/${attachmentId}`,
+        `https://opeco.link/api/sessions/${session.id}/attachments/${attachmentId}`,
         { headers: { authorization: `Bearer ${session.sessionToken}` } },
       )).status).toBe(404);
     }
@@ -736,14 +736,14 @@ describe("devices and persistent groups", () => {
     const unreadable = await api(`/api/device-requests/${request.id}?deviceId=${second.id}`, {
       token: await sign(
         first.signingKey,
-        ["notify.guru/device-request-read/v1", request.id, second.id].join("\n"),
+        ["opeco.link/device-request-read/v1", request.id, second.id].join("\n"),
       ),
     });
     expect(unreadable.status).toBe(401);
 
     const approvalSignature = await sign(
       first.signingKey,
-      ["notify.guru/group-device-approve/v1", group.id, first.id, request.id].join("\n"),
+      ["opeco.link/group-device-approve/v1", group.id, first.id, request.id].join("\n"),
     );
     const approve = () => api(
       `/api/groups/${group.id}/device-requests/${request.id}/approve?deviceId=${first.id}`,
@@ -790,7 +790,7 @@ describe("devices and persistent groups", () => {
       body: {
         actorSignature: await sign(
           first.signingKey,
-          ["notify.guru/group-device-remove/v1", group.id, first.id, second.id].join("\n"),
+          ["opeco.link/group-device-remove/v1", group.id, first.id, second.id].join("\n"),
         ),
       },
     });
@@ -824,7 +824,7 @@ describe("devices and persistent groups", () => {
         body: {
           actorSignature: await sign(
             first.signingKey,
-            ["notify.guru/group-device-approve/v1", group.id, first.id, repeatedRequest.id].join("\n"),
+            ["opeco.link/group-device-approve/v1", group.id, first.id, repeatedRequest.id].join("\n"),
           ),
         },
       },
@@ -1077,7 +1077,7 @@ describe("devices and persistent groups", () => {
     const device = await newDevice();
     const group = await createGroup(device);
     const response = await api(`/api/groups/${group.id}/current`, {
-      headers: { "x-notify-guru-internal": "1" },
+      headers: { "x-opeco-link-internal": "1" },
     });
     expect(response.status).toBe(404);
   });
@@ -1121,7 +1121,7 @@ async function newDevice(): Promise<Device> {
   const nonce = randomToken();
   const signature = await sign(
     signingKey,
-    ["notify.guru/device-create/v1", signingPublicKey, nonce].join("\n"),
+    ["opeco.link/device-create/v1", signingPublicKey, nonce].join("\n"),
   );
   const created = await api("/api/devices", {
     method: "POST",
@@ -1154,7 +1154,7 @@ async function createGroup(device: Device): Promise<Group> {
   const id = randomId();
   const accessHash = await hash(device.token);
   const transcript = [
-    "notify.guru/group-create/v2",
+    "opeco.link/group-create/v2",
     id,
     device.id,
     accessHash,
@@ -1192,10 +1192,10 @@ async function createV4Group(device: Device) {
   const transitionTranscript = groupTransitionTranscript(id, transition);
   const actorSignature = await sign(device.signingKey, transitionTranscript);
   const continuitySignature = await sign(groupSigningKey, transitionTranscript);
-  const transitionHash = await hash(["notify.guru/group-transition-hash/v2", transitionTranscript].join("\n"));
+  const transitionHash = await hash(["opeco.link/group-transition-hash/v2", transitionTranscript].join("\n"));
   const signedTransition = { ...transition, actorSignature, continuitySignature, transitionHash };
   const transcript = [
-    "notify.guru/group-create/v2", id, device.id, accessHash, device.encryptionPublicKey,
+    "opeco.link/group-create/v2", id, device.id, accessHash, device.encryptionPublicKey,
   ].join("\n");
   const created = await api("/api/groups", {
     method: "POST",
@@ -1219,7 +1219,7 @@ async function createV4DeviceRequest(device: Device): Promise<{ id: string }> {
   const id = randomId();
   const accessHash = await hash(device.token);
   const transcript = [
-    "notify.guru/device-request/v2", id, device.id, accessHash,
+    "opeco.link/device-request/v2", id, device.id, accessHash,
     device.encryptionPublicKey, "3,4",
   ].join("\n");
   const created = await api("/api/device-requests", {
@@ -1261,7 +1261,7 @@ async function createSignedV4Transition(
   const transcript = groupTransitionTranscript(groupId, transition);
   const actorSignature = await sign(actor.signingKey, transcript);
   const continuitySignature = await sign(previousContinuityKey, transcript);
-  const transitionHash = await hash(["notify.guru/group-transition-hash/v2", transcript].join("\n"));
+  const transitionHash = await hash(["opeco.link/group-transition-hash/v2", transcript].join("\n"));
   return {
     transition: { ...transition, actorSignature, continuitySignature, transitionHash },
     packages,
@@ -1273,7 +1273,7 @@ async function createDeviceRequest(device: Device): Promise<{ id: string; expire
   const id = randomId();
   const accessHash = await hash(device.token);
   const transcript = [
-    "notify.guru/device-request/v1",
+    "opeco.link/device-request/v1",
     id,
     device.id,
     accessHash,
@@ -1296,7 +1296,7 @@ async function createDeviceRequest(device: Device): Promise<{ id: string; expire
 async function getDeviceRequest(device: Device, requestId: string) {
   const signature = await sign(
     device.signingKey,
-    ["notify.guru/device-request-read/v1", requestId, device.id].join("\n"),
+    ["opeco.link/device-request-read/v1", requestId, device.id].join("\n"),
   );
   return (await api(`/api/device-requests/${requestId}?deviceId=${device.id}`, { token: signature })).json;
 }
@@ -1381,7 +1381,7 @@ async function prepareSessionJoin(
     })).status).toBe(200);
   }
   const descriptorTranscript = [
-    "notify.guru/session-descriptor/v1", sessionId, group.id, "4", key.publicKey,
+    "opeco.link/session-descriptor/v1", sessionId, group.id, "4", key.publicKey,
     String(key.timestamp), key.transitionHash, device.id,
   ].join("\n");
   const proof = randomToken();
@@ -1418,7 +1418,7 @@ async function establishSessionParticipation(
   key: RegisteredKey,
 ) {
   const joinHash = await hash([
-    "notify.guru/session-join-operation/v1",
+    "opeco.link/session-join-operation/v1",
     prepared.session.id,
     prepared.pairingId,
     group.id,
@@ -1570,7 +1570,7 @@ function keyPackage(deviceId: string) {
 
 async function keyPackageDigest(value: ReturnType<typeof keyPackage>): Promise<string> {
   return hash([
-    "notify.guru/group-key-package/v1", value.deviceId, value.ephemeralPublicKey,
+    "opeco.link/group-key-package/v1", value.deviceId, value.ephemeralPublicKey,
     value.nonce, value.ciphertext,
   ].join("\n"));
 }
@@ -1587,7 +1587,7 @@ function groupTransitionTranscript(
   const members = [...transition.members].sort((a, b) => a.deviceId < b.deviceId ? -1 : a.deviceId > b.deviceId ? 1 : 0);
   const digests = [...transition.packageDigests].sort((a, b) => a.deviceId < b.deviceId ? -1 : a.deviceId > b.deviceId ? 1 : 0);
   const lines = [
-    "notify.guru/group-transition/v1", groupId, transition.transitionId, transition.previousHash,
+    "opeco.link/group-transition/v1", groupId, transition.transitionId, transition.previousHash,
     String(transition.timestamp), transition.actorDeviceId, transition.publicKey,
     transition.recreated ? "1" : "0", String(members.length),
   ];
@@ -1608,7 +1608,7 @@ function groupKeyTranscript(
   const sortedMembers = [...members].sort();
   const packagesByDevice = new Map(packages.map((item) => [item.deviceId, item]));
   const lines = [
-    "notify.guru/group-key-register/v1",
+    "opeco.link/group-key-register/v1",
     groupId,
     actorDeviceId,
     keyPublicKey,
@@ -1644,7 +1644,7 @@ async function api(
   const headers = new Headers(options.headers);
   if (options.token !== undefined) headers.set("authorization", `Bearer ${options.token}`);
   if (options.body !== undefined) headers.set("content-type", "application/json");
-  const response = await SELF.fetch(`https://notify.guru${path}`, {
+  const response = await SELF.fetch(`https://opeco.link${path}`, {
     method: options.method ?? "GET",
     headers,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),

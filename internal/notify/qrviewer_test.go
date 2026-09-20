@@ -19,7 +19,7 @@ func TestQRViewerServesAnInMemoryImageAtAnOpaqueLoopbackURL(t *testing.T) {
 		}
 	})
 
-	pairingURL := "https://notify.guru/join#v=1&s=session&p=pairing&t=secret"
+	pairingURL := "https://opeco.link/join#v=1&s=session&p=pairing&t=secret"
 	imageURL, err := viewer.Publish(pairingURL)
 	if err != nil {
 		t.Fatal(err)
@@ -77,7 +77,7 @@ func TestQRViewerRejectsOtherHostsAndExpiredPaths(t *testing.T) {
 		}
 	})
 
-	imageURL, err := viewer.Publish("https://notify.guru/join#secret")
+	imageURL, err := viewer.Publish("https://opeco.link/join#secret")
 	if err != nil {
 		t.Fatal(err)
 	}

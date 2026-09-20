@@ -3,8 +3,8 @@ import { qrMatrix } from "../web/qr.js";
 
 describe("browser QR generation", () => {
   it("generates a deterministic square matrix without exposing the value externally", () => {
-    const first = qrMatrix("https://notify.guru/device#secret-in-fragment");
-    const second = qrMatrix("https://notify.guru/device#secret-in-fragment");
+    const first = qrMatrix("https://opeco.link/device#secret-in-fragment");
+    const second = qrMatrix("https://opeco.link/device#secret-in-fragment");
 
     expect(first.size).toBeGreaterThanOrEqual(21);
     expect(first.modules).toEqual(second.modules);

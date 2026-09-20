@@ -27,9 +27,9 @@ import (
 )
 
 func TestMCPEncryptedRoundTrip(t *testing.T) {
-	baseURL := os.Getenv("NOTIFY_INTEGRATION_BASE_URL")
+	baseURL := os.Getenv("OPECO_INTEGRATION_BASE_URL")
 	if baseURL == "" {
-		t.Fatal("NOTIFY_INTEGRATION_BASE_URL is required")
+		t.Fatal("OPECO_INTEGRATION_BASE_URL is required")
 	}
 	api, err := NewAPI(baseURL)
 	if err != nil {
@@ -38,9 +38,9 @@ func TestMCPEncryptedRoundTrip(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	t.Cleanup(cancel)
-	command := exec.CommandContext(ctx, "go", "run", "../../cmd/notifyg", "--base-url", baseURL, "mcp")
+	command := exec.CommandContext(ctx, "go", "run", "../../cmd/opeco", "--base-url", baseURL, "mcp")
 	command.Stderr = os.Stderr
-	client := mcp.NewClient(&mcp.Implementation{Name: "notify-guru-integration-test", Version: "0.1.0"}, nil)
+	client := mcp.NewClient(&mcp.Implementation{Name: "opeco-link-integration-test", Version: "0.1.0"}, nil)
 	clientSession, err := client.Connect(ctx, &mcp.CommandTransport{Command: command}, nil)
 	if err != nil {
 		t.Fatalf("connect to MCP server: %v", err)
@@ -612,7 +612,7 @@ func joinFromPairingURL(t *testing.T, ctx context.Context, api *API, rawURL stri
 	var registered struct {
 		DeviceID string `json:"deviceId"`
 	}
-	deviceCreateTranscript := fmt.Sprintf("notify.guru/device-create/v1\n%s\n%s", deviceSigningPublicKey, registrationNonce)
+	deviceCreateTranscript := fmt.Sprintf("opeco.link/device-create/v1\n%s\n%s", deviceSigningPublicKey, registrationNonce)
 	if err := api.do(ctx, http.MethodPost, "/api/devices", "", map[string]any{
 		"signingPublicKey": deviceSigningPublicKey,
 		"nonce":            registrationNonce,
@@ -636,7 +636,7 @@ func joinFromPairingURL(t *testing.T, ctx context.Context, api *API, rawURL stri
 		"ciphertext":         packageCiphertext,
 	}
 	packageTranscript := fmt.Sprintf(
-		"notify.guru/group-key-package/v1\n%s\n%s\n%s\n%s",
+		"opeco.link/group-key-package/v1\n%s\n%s\n%s\n%s",
 		deviceID, deviceEncryptionPublicKey, packageNonce, packageCiphertext,
 	)
 	packageDigest := sha256.Sum256([]byte(packageTranscript))
@@ -664,7 +664,7 @@ func joinFromPairingURL(t *testing.T, ctx context.Context, api *API, rawURL stri
 	transition.ContinuitySignature = signIntegrationRawP256(t, groupContinuityKey, transitionTranscript)
 	transition.TransitionHash = groupTransitionHash(groupID, transition)
 	createTranscript := fmt.Sprintf(
-		"notify.guru/group-create/v2\n%s\n%s\n%s\n%s",
+		"opeco.link/group-create/v2\n%s\n%s\n%s\n%s",
 		groupID, deviceID, tokenHash(accessToken), deviceEncryptionPublicKey,
 	)
 	deviceSignature := signIntegrationRawP256(t, deviceSigningKey, createTranscript)
@@ -696,7 +696,7 @@ func joinFromPairingURL(t *testing.T, ctx context.Context, api *API, rawURL stri
 	fmt.Fprintf(mac, "v4\n%s\n%s\n%s\n%d\n%s\n%s", sessionID, pairingID, groupID, transition.Timestamp, publicKey, transition.TransitionHash)
 	proof := encode(mac.Sum(nil))
 	descriptorTranscript := fmt.Sprintf(
-		"notify.guru/session-descriptor/v1\n%s\n%s\n4\n%s\n%d\n%s\n%s",
+		"opeco.link/session-descriptor/v1\n%s\n%s\n4\n%s\n%d\n%s\n%s",
 		sessionID, groupID, creatorPublicKey, transition.Timestamp, transition.TransitionHash, deviceID,
 	)
 	sessionDescriptor := map[string]any{

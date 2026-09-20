@@ -1,0 +1,134 @@
+import CryptoKit
+import Foundation
+
+enum ServiceOrigin {
+    static let primaryHost = "opeco.link"
+    static let primaryURL = URL(string: "https://\(primaryHost)")!
+
+    static func accepts(host: String?) -> Bool {
+        guard let host = host?.lowercased() else { return false }
+        return host == primaryHost
+    }
+}
+
+struct PairingLink: Equatable {
+    let protocolVersion: Int
+    let sessionID: String
+    let pairingID: String
+    let pairingToken: String
+    let authSecret: String
+    let creatorPublicKey: String
+    let color: String
+
+    init(_ value: String) throws {
+        guard let components = URLComponents(string: value),
+              components.scheme == "https",
+              ServiceOrigin.accepts(host: components.host),
+              components.path == "/join",
+              components.query == nil,
+              let fragment = components.fragment else {
+            throw ProtocolError.invalidPairingLink("expected an https://opeco.link/join URL")
+        }
+        guard let fragmentComponents = URLComponents(string: "https://fragment.invalid/?\(fragment)"),
+              let items = fragmentComponents.queryItems else {
+            throw ProtocolError.invalidPairingLink("fragment is not a query string")
+        }
+        let expected = Set(["v", "s", "p", "t", "a", "k", "c"])
+        guard items.count == expected.count, Set(items.map(\.name)) == expected else {
+            throw ProtocolError.invalidPairingLink("fragment fields do not match the protocol")
+        }
+        var fields: [String: String] = [:]
+        for item in items {
+            guard let itemValue = item.value, !itemValue.isEmpty, fields[item.name] == nil else {
+                throw ProtocolError.invalidPairingLink("fragment contains an empty or duplicate field")
+            }
+            fields[item.name] = itemValue
+        }
+        guard let protocolVersion = Int(fields["v"]!), protocolVersion == 3 || protocolVersion == 4 else {
+            throw ProtocolError.invalidPairingLink("unsupported protocol version")
+        }
+        let sessionID = fields["s"]!
+        let pairingID = fields["p"]!
+        let pairingToken = fields["t"]!
+        let authSecret = fields["a"]!
+        let creatorPublicKey = fields["k"]!
+        try Self.requireIdentifier(sessionID, name: "session ID")
+        try Self.requireIdentifier(pairingID, name: "pairing ID")
+        guard try Base64URL.decode(pairingToken).count == 32 else {
+            throw ProtocolError.invalidPairingLink("pairing token must contain 32 bytes")
+        }
+        guard try Base64URL.decode(authSecret).count == 32 else {
+            throw ProtocolError.invalidPairingLink("authentication secret must contain 32 bytes")
+        }
+        guard (try? P256.KeyAgreement.PublicKey(
+            x963Representation: Base64URL.decode(creatorPublicKey)
+        )) != nil else {
+            throw ProtocolError.invalidPairingLink("creator public key must be an uncompressed P-256 key")
+        }
+        let color = fields["c"]!
+        guard color.range(of: #"^[0-9a-fA-F]{6}$"#, options: .regularExpression) != nil else {
+            throw ProtocolError.invalidPairingLink("session color must contain six hexadecimal digits")
+        }
+        self.protocolVersion = protocolVersion
+        self.sessionID = sessionID
+        self.pairingID = pairingID
+        self.pairingToken = pairingToken
+        self.authSecret = authSecret
+        self.creatorPublicKey = creatorPublicKey
+        self.color = "#\(color.lowercased())"
+    }
+
+    static func requireIdentifier(_ value: String, name: String) throws {
+        guard (16...64).contains(value.count), value.utf8.allSatisfy({ byte in
+            (byte >= 48 && byte <= 57) ||
+                (byte >= 65 && byte <= 90) ||
+                (byte >= 97 && byte <= 122) ||
+                byte == 45 || byte == 95
+        }) else {
+            throw ProtocolError.invalidPairingLink("invalid \(name)")
+        }
+    }
+}
+
+struct DeviceRequestLink: Equatable {
+    let requestID: String
+    let authSecret: String
+    let requestHash: String
+
+    init(_ value: String) throws {
+        guard let components = URLComponents(string: value),
+              components.scheme == "https",
+              ServiceOrigin.accepts(host: components.host),
+              components.path == "/device",
+              components.query == nil,
+              let fragment = components.fragment,
+              let parsed = URLComponents(string: "https://fragment.invalid/?\(fragment)"),
+              let items = parsed.queryItems else {
+            throw ProtocolError.invalidPairingLink("expected an https://opeco.link/device URL")
+        }
+        let expected = Set(["v", "r", "a", "h"])
+        guard items.count == expected.count, Set(items.map(\.name)) == expected else {
+            throw ProtocolError.invalidPairingLink("the add-to-group link has an invalid format")
+        }
+        var fields: [String: String] = [:]
+        for item in items {
+            guard let itemValue = item.value, !itemValue.isEmpty, fields[item.name] == nil else {
+                throw ProtocolError.invalidPairingLink("the add-to-group link has an empty or duplicate field")
+            }
+            fields[item.name] = itemValue
+        }
+        guard fields["v"] == "3" else {
+            throw ProtocolError.invalidPairingLink("this add-to-group link cannot be used by this app")
+        }
+        try PairingLink.requireIdentifier(fields["r"]!, name: "link identifier")
+        guard (try? Base64URL.decode(fields["a"]!))?.count == 32 else {
+            throw ProtocolError.invalidPairingLink("device approval secret must contain 32 bytes")
+        }
+        guard fields["h"]!.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil else {
+            throw ProtocolError.invalidPairingLink("device request hash must contain 64 hexadecimal digits")
+        }
+        requestID = fields["r"]!
+        authSecret = fields["a"]!
+        requestHash = fields["h"]!
+    }
+}

@@ -11,7 +11,7 @@ case "$suite" in
   *) print -u2 "Unknown test suite: $suite"; exit 2 ;;
 esac
 
-results_dir=${TEST_RESULTS_DIR:-/tmp/notify-guru-test-results-$(date +%Y%m%d-%H%M%S)-$$}
+results_dir=${TEST_RESULTS_DIR:-/tmp/opeco-link-test-results-$(date +%Y%m%d-%H%M%S)-$$}
 phone_simulator=${IOS_PHONE_SIMULATOR:-iPhone 17 Pro}
 tablet_simulator=${IOS_TABLET_SIMULATOR:-iPad Pro 13-inch (M5)}
 phone_destination="platform=iOS Simulator,name=$phone_simulator,OS=latest"
@@ -33,8 +33,8 @@ prepare_ios_ui_tests() {
 
   xcrun simctl bootstatus "$simulator" -b
   installed_apps=$(xcrun simctl listapps "$simulator")
-  if [[ "$installed_apps" == *'"guru.notify.app" ='* ]]; then
-    xcrun simctl uninstall "$simulator" guru.notify.app
+  if [[ "$installed_apps" == *'"link.opeco.app" ='* ]]; then
+    xcrun simctl uninstall "$simulator" link.opeco.app
   fi
 }
 
@@ -49,7 +49,7 @@ run_ui_tests() {
   local test_status=0
 
   xcodebuild \
-    -project ios/NotifyGuru.xcodeproj \
+    -project ios/Opeco.xcodeproj \
     -scheme "$scheme" \
     -destination "$destination" \
     -parallel-testing-enabled NO \
@@ -73,6 +73,7 @@ print "Test results: $results_dir"
 if [[ "$suite" == all ]]; then
   print "Running Worker and Web tests"
   npm run check
+  npm run test:e2e
 
   print "Running Go tests"
   go test -count=1 ./...
@@ -87,7 +88,7 @@ if [[ "$suite" == all ]]; then
     --retry-connrefused \
     http://127.0.0.1:8787/api/health
   kill -0 "$worker_pid"
-  NOTIFY_INTEGRATION_BASE_URL=http://127.0.0.1:8787 go test -count=1 -tags integration ./internal/notify
+  OPECO_INTEGRATION_BASE_URL=http://127.0.0.1:8787 go test -count=1 -tags integration ./internal/notify
   cleanup
   worker_pid=""
 fi
@@ -95,32 +96,32 @@ fi
 if [[ "$suite" == all || "$suite" == ios-unit ]]; then
   print "Running iOS unit tests"
   xcodebuild \
-    -project ios/NotifyGuru.xcodeproj \
-    -scheme NotifyGuru \
+    -project ios/Opeco.xcodeproj \
+    -scheme Opeco \
     -destination "$phone_destination" \
     -parallel-testing-enabled NO \
     -resultBundlePath "$results_dir/ios-unit.xcresult" \
-    -only-testing:NotifyGuruTests \
+    -only-testing:OpecoTests \
     test
 fi
 
 if [[ "$suite" == all || "$suite" == iphone ]]; then
   print "Running iPhone UI tests"
   prepare_ios_ui_tests "$phone_simulator"
-  run_ui_tests ios-ui-iphone NotifyGuru "$phone_destination" NotifyGuruUITests
+  run_ui_tests ios-ui-iphone Opeco "$phone_destination" OpecoUITests
 fi
 
 if [[ "$suite" == all || "$suite" == ipad ]]; then
   print "Running iPad UI tests"
   prepare_ios_ui_tests "$tablet_simulator"
-  run_ui_tests ios-ui-ipad NotifyGuru "$tablet_destination" NotifyGuruUITests
+  run_ui_tests ios-ui-ipad Opeco "$tablet_destination" OpecoUITests
 fi
 
 if [[ "$suite" == all || "$suite" == macos ]]; then
   print "Running macOS UI tests"
-  run_ui_tests macos-ui NotifyGuruMac "platform=macOS" NotifyGuruMacUITests \
-    -xcconfig macos/NotifyGuruMacUITests/UITesting.xcconfig \
-    -derivedDataPath "${TMPDIR:-/tmp/}notify-guru-macos-ui-derived-data"
+  run_ui_tests macos-ui OpecoMac "platform=macOS" OpecoMacUITests \
+    -xcconfig macos/OpecoMacUITests/UITesting.xcconfig \
+    -derivedDataPath "${TMPDIR:-/tmp/}opeco-link-macos-ui-derived-data"
 fi
 
 print "Test suite passed: $suite"
