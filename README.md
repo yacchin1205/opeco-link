@@ -1,10 +1,14 @@
 # opeco.link
 
+<img src="brand/readme-icon.svg" alt="opeco" width="128" height="128">
+
 opeco.link connects a short-lived Agent or CLI session to one or more device groups, letting people follow work, answer questions, and send feedback. Join through a one-shot QR code or pairing link using the PWA, iOS/iPadOS app, or macOS app. Subsequent notifications, status updates, questions, and responses are end-to-end encrypted.
 
 There are no user accounts and no recovery flow. A session expires one day after its creator's last activity. The relay stores ciphertext and routing metadata, but does not receive application payloads in plaintext. The web client must still trust the JavaScript served by its origin.
 
 The PWA is available at [opeco.link](https://opeco.link).
+
+![Architecture: the opeco CLI connects an agent workspace to your devices through opeco.link with end-to-end encrypted communication.](brand/architecture.svg)
 
 ## Install
 
