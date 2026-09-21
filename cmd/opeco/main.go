@@ -28,23 +28,48 @@ func run() (runErr error) {
 	flags := flag.NewFlagSet("opeco", flag.ContinueOnError)
 	flags.SetOutput(os.Stderr)
 	baseURL := flags.String("base-url", "https://opeco.link", "opeco service URL")
-	title := flags.String("title", "Development session", "interactive session title")
+	title := flags.String("title", "Development session", "new session title")
 	color := flags.String("color", "random", "session panel color: random or #rrggbb")
-	noTerminalQR := flags.Bool("no-terminal-qr", false, "do not draw the pairing QR code in the terminal; the QR image URL and pairing URL are still printed")
+	interactiveMode := flags.Bool("interactive", false, "run the long-lived interactive CLI instead of exporting a shell session")
+	noTerminalQR := flags.Bool("no-terminal-qr", false, "print the pairing URL without drawing a terminal QR code")
+	flags.Usage = func() {
+		fmt.Fprintln(flags.Output(), "Usage: eval \"$(opeco [--title TITLE] [--color COLOR])\"\n       opeco COMMAND [ARGS...]\n       opeco --interactive [--title TITLE]\n       opeco mcp\n\nCommands: join, pair, notify TEXT, status TEXT, color COLOR, request PROMPT OPTION OPTION..., close-request ID, responses, close")
+		flags.PrintDefaults()
+	}
 	if err := flags.Parse(os.Args[1:]); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return nil
+		}
 		return err
 	}
-	if flags.NArg() > 1 {
-		return fmt.Errorf("usage: opeco [--base-url URL] [--title TITLE] [--color random|#rrggbb] [--no-terminal-qr] [mcp]")
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if *interactiveMode && flags.NArg() != 0 {
+		return fmt.Errorf("--interactive does not take a command")
 	}
-
+	if flags.NArg() > 0 && flags.Arg(0) != "mcp" {
+		var invalidFlag string
+		flags.Visit(func(f *flag.Flag) {
+			if f.Name != "no-terminal-qr" {
+				invalidFlag = f.Name
+			}
+		})
+		if invalidFlag != "" {
+			return fmt.Errorf("--%s is only used when starting a session; commands use OPECO_SESSION_FILE", invalidFlag)
+		}
+		return shellCommand(ctx, os.Getenv("OPECO_SESSION_FILE"), flags.Args(), !*noTerminalQR && isCharacterDevice(os.Stdout), os.Stdout)
+	}
+	if flags.NArg() > 1 {
+		return fmt.Errorf("mcp does not take arguments")
+	}
 	api, err := notify.NewAPI(*baseURL)
 	if err != nil {
 		return err
 	}
+	if !*interactiveMode && flags.NArg() == 0 {
+		return startShellSession(ctx, api, *title, *color, !*noTerminalQR && isCharacterDevice(os.Stderr), os.Stdout, os.Stderr)
+	}
 	store := notify.NewStore(api)
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 	viewer, err := notify.NewQRViewer()
 	if err != nil {
 		return err
@@ -55,9 +80,6 @@ func run() (runErr error) {
 
 	operation := func(ctx context.Context) error {
 		if flags.NArg() == 1 {
-			if flags.Arg(0) != "mcp" {
-				return fmt.Errorf("unknown mode %q", flags.Arg(0))
-			}
 			return mcpserver.New(store, viewer).Run(ctx)
 		}
 		terminalQR := !*noTerminalQR && isCharacterDevice(os.Stdout)
@@ -162,7 +184,7 @@ func interactive(ctx context.Context, store *notify.Store, viewer *notify.QRView
 				continue
 			}
 			command, argument, _ := strings.Cut(line, " ")
-			exit, err := runCommand(ctx, store, viewer, sessionID, command, argument, &knownGroups, terminalQR, output, errorOutput)
+			exit, err := runCommand(ctx, store, viewer, sessionID, command, argument, &knownGroups, terminalQR, output)
 			if err != nil {
 				return err
 			}
@@ -175,105 +197,53 @@ func interactive(ctx context.Context, store *notify.Store, viewer *notify.QRView
 }
 
 func writePairing(output io.Writer, pairingURL, imageURL string, terminalQR bool) error {
-	if terminalQR {
-		qr, err := notify.QRCode(pairingURL)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(output, "%s\n", qr)
+	if err := writeTerminalPairing(output, pairingURL, terminalQR); err != nil {
+		return err
 	}
-	fmt.Fprintf(output, "%s\nQR image: %s\n", pairingURL, imageURL)
-	return nil
+	_, err := fmt.Fprintf(output, "QR image: %s\n", imageURL)
+	return err
 }
 
-func runCommand(ctx context.Context, store *notify.Store, viewer *notify.QRViewer, sessionID, command, argument string, knownGroups *int, terminalQR bool, output, errorOutput io.Writer) (bool, error) {
+func runCommand(ctx context.Context, store *notify.Store, viewer *notify.QRViewer, sessionID, command, argument string, knownGroups *int, terminalQR bool, output io.Writer) (bool, error) {
+	if command == "quit" {
+		return true, nil
+	}
+	args := []string{command}
+	if command == "request" {
+		for _, part := range strings.Split(argument, "|") {
+			args = append(args, strings.TrimSpace(part))
+		}
+	} else if argument != "" {
+		args = append(args, argument)
+	}
+	if err := validateShellCommand(args); err != nil {
+		return false, err
+	}
 	switch command {
 	case "join":
 		count, err := store.RefreshGroups(ctx, sessionID)
 		if err != nil {
-			fmt.Fprintln(errorOutput, err)
-			return false, nil
+			return false, err
 		}
 		*knownGroups = count
-		fmt.Fprintf(output, "%d device group(s) joined\n", count)
+		_, err = fmt.Fprintf(output, "%d device group(s) joined\n", count)
+		return false, err
 	case "pair":
 		url, err := store.AddPairing(ctx, sessionID)
 		if err != nil {
-			fmt.Fprintln(errorOutput, err)
-			return false, nil
+			return false, err
 		}
 		imageURL, err := viewer.Publish(url)
 		if err != nil {
 			return false, err
 		}
-		if err := writePairing(output, url, imageURL, terminalQR); err != nil {
-			return false, err
-		}
-	case "notify":
-		itemID, err := store.SendNotify(ctx, sessionID, argument)
-		if err != nil {
-			fmt.Fprintln(errorOutput, err)
-			return false, nil
-		}
-		fmt.Fprintf(output, "notification item=%s sent\n", itemID)
-	case "status":
-		if err := store.SendStatus(ctx, sessionID, argument); err != nil {
-			fmt.Fprintln(errorOutput, err)
-			return false, nil
-		}
-		fmt.Fprintln(output, "sent")
-	case "color":
-		if err := store.SetColor(ctx, sessionID, argument); err != nil {
-			fmt.Fprintln(errorOutput, err)
-			return false, nil
-		}
-		fmt.Fprintln(output, "color changed")
-	case "request":
-		parts := strings.Split(argument, "|")
-		if len(parts) < 3 {
-			fmt.Fprintln(errorOutput, "request requires a prompt and at least two options separated by |")
-			return false, nil
-		}
-		for index := range parts {
-			parts[index] = strings.TrimSpace(parts[index])
-		}
-		requestID, choices, err := store.SendRequest(ctx, sessionID, parts[0], parts[1:])
-		if err != nil {
-			fmt.Fprintln(errorOutput, err)
-			return false, nil
-		}
-		fmt.Fprintf(output, "request %s sent: %v\n", requestID, choices)
-	case "close-request":
-		if err := store.CloseRequest(ctx, sessionID, argument); err != nil {
-			fmt.Fprintln(errorOutput, err)
-			return false, nil
-		}
-		fmt.Fprintln(output, "request closed")
-	case "responses":
-		responses, err := store.Responses(ctx, sessionID)
-		if err != nil {
-			fmt.Fprintln(errorOutput, err)
-			return false, nil
-		}
-		for _, response := range responses {
-			writeResponse(output, response)
-		}
-	case "close":
-		if err := store.Close(ctx, sessionID); err != nil {
-			fmt.Fprintln(errorOutput, err)
-			return false, nil
-		}
-		fmt.Fprintln(output, "closed")
-		return true, nil
-	case "quit":
-		return true, nil
+		return false, writePairing(output, url, imageURL, terminalQR)
 	default:
-		fmt.Fprintf(errorOutput, "unknown command %q\n", command)
+		return command == "close", executeCommand(ctx, store, sessionID, args, output)
 	}
-	return false, nil
 }
 
-func writeResponse(output io.Writer, response notify.Response) {
+func writeResponse(output io.Writer, response notify.Response) (err error) {
 	timestamp := response.CreatedAt.Format("2006-01-02T15:04:05Z07:00")
 	switch response.Type {
 	case "feedback":
@@ -281,14 +251,15 @@ func writeResponse(output io.Writer, response notify.Response) {
 		for i, image := range response.Attachments {
 			attachment += fmt.Sprintf(" attachment[%d]=%s", i+1, image.Path)
 		}
-		fmt.Fprintf(output, "feedback message=%q%s group=%s at=%s\n", response.Message, attachment, response.GroupID, timestamp)
+		_, err = fmt.Fprintf(output, "feedback message=%q%s group=%s at=%s\n", response.Message, attachment, response.GroupID, timestamp)
 	case "dismiss":
 		if response.ItemID != "" {
-			fmt.Fprintf(output, "dismiss item=%s group=%s at=%s\n", response.ItemID, response.GroupID, timestamp)
+			_, err = fmt.Fprintf(output, "dismiss item=%s group=%s at=%s\n", response.ItemID, response.GroupID, timestamp)
 		} else {
-			fmt.Fprintf(output, "dismiss request=%s group=%s at=%s\n", response.RequestID, response.GroupID, timestamp)
+			_, err = fmt.Fprintf(output, "dismiss request=%s group=%s at=%s\n", response.RequestID, response.GroupID, timestamp)
 		}
 	case "response":
-		fmt.Fprintf(output, "response request=%s option=%s group=%s at=%s\n", response.RequestID, response.OptionID, response.GroupID, timestamp)
+		_, err = fmt.Fprintf(output, "response request=%s option=%s group=%s at=%s\n", response.RequestID, response.OptionID, response.GroupID, timestamp)
 	}
+	return err
 }

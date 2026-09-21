@@ -838,14 +838,16 @@ func (s *Store) Close(ctx context.Context, sessionID string) error {
 	if err != nil {
 		return err
 	}
-	if session.tempDir != "" {
-		_ = os.RemoveAll(session.tempDir)
-	}
 	session.mu.Lock()
 	err = s.api.closeSession(ctx, session.id, session.sessionToken)
 	session.mu.Unlock()
 	if err != nil {
 		return err
+	}
+	if session.tempDir != "" {
+		if err := os.RemoveAll(session.tempDir); err != nil {
+			return err
+		}
 	}
 	s.mu.Lock()
 	delete(s.sessions, sessionID)
