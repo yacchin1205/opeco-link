@@ -53,6 +53,40 @@ func TestIsTransientAPIErrorDoesNotRetryAfterCallerCancellation(t *testing.T) {
 	}
 }
 
+func TestAPIReportsTheStatusAndBodyOfAnInvalidErrorResponse(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		body string
+		want string
+	}{
+		{body: "error code: 1101", want: `opeco.link API: unexpected 500 response: "error code: 1101"`},
+		{
+			body: strings.Repeat("x", 300),
+			want: `opeco.link API: unexpected 500 response: "` + strings.Repeat("x", 200) + `" (first 200 of 300 bytes)`,
+		},
+	} {
+		api, err := NewAPI("https://opeco.link")
+		if err != nil {
+			t.Fatal(err)
+		}
+		api.client.Transport = roundTripFunc(func(*http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       io.NopCloser(strings.NewReader(test.body)),
+			}, nil
+		})
+		err = api.do(context.Background(), http.MethodGet, "/test", "", nil, nil)
+		if err == nil || err.Error() != test.want {
+			t.Fatalf("error = %v, want %s", err, test.want)
+		}
+		_, err = api.attachment(context.Background(), "session", "token", "attachment", 1)
+		if err == nil || err.Error() != test.want {
+			t.Fatalf("attachment error = %v, want %s", err, test.want)
+		}
+	}
+}
+
 func TestAPIClassifiesAnInvalidErrorResponseByItsHTTPStatus(t *testing.T) {
 	t.Parallel()
 
