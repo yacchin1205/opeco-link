@@ -22,12 +22,47 @@ go build -o opeco ./cmd/opeco
 
 Place the resulting `opeco` executable (`opeco.exe` on Windows) on your `PATH`.
 
+## Shell CLI
+
+Create a session in a POSIX-compatible shell (such as bash or zsh):
+
+```sh
+eval "$(opeco --title 'Deployment')"
+```
+
+`opeco` prints only shell exports to stdout, prints the one-shot pairing link and terminal QR code to stderr, and exits. Pair a device using that link or QR code, then run commands from the same shell:
+
+```sh
+opeco join
+opeco status "Building"
+opeco notify "Build completed"
+opeco request "Continue deployment?" "Continue" "Stop"
+opeco responses
+opeco close-request REQUEST_ID
+opeco color '#d9f2d0'
+opeco pair
+opeco close
+unset OPECO_SESSION_FILE OPECO_SESSION_ID
+```
+
+There is no background process. `OPECO_SESSION_FILE` points to a private temporary state file; `OPECO_SESSION_ID` identifies the session. Each command loads and saves the creator keys, authenticated group history, open requests, and response cursor under an exclusive file lock. Child shells inherit the session. Running the initialization again creates a separate session; it does not close the previous one.
+
+`responses` returns responses not previously read by this shell session, including free-form messages and verified photo paths. Run it again to check for new replies. `pair` prints an additional one-shot pairing link (and a QR code when stdout is a terminal). No local QR image server runs in shell mode; use `--interactive` for the browser-based QR viewer.
+
+`close` deletes the remote session and its local state and attachments. It cannot unset variables in the parent shell, so unset them afterward. A command that discovers the session has expired also removes its local files and reports the API error. Merely leaving the shell does not close the session or remove its files; abandoned files remain until ordinary OS temporary-file cleanup. Losing the file means losing control of that session, with no recovery flow.
+
+For local development, supply the service URL at initialization. Later commands use the saved URL:
+
+```sh
+eval "$(opeco --base-url http://127.0.0.1:8787 --title 'Local session')"
+```
+
 ## Interactive CLI
 
 Start a session:
 
 ```sh
-opeco --title "Deployment"
+opeco --interactive --title "Deployment"
 ```
 
 The CLI prints a terminal QR code, its pairing URL, and a `QR image` URL such as `http://127.0.0.1:49152/qr/...`. Open the local URL in a browser to display a full-size QR image without creating a file, then scan it with the receiving device. The CLI reports when a new device group starts receiving the session.
@@ -65,7 +100,7 @@ quit
 Use `--base-url` before the optional mode argument when connecting to a development deployment:
 
 ```sh
-opeco --base-url http://127.0.0.1:8787 --title "Local session"
+opeco --interactive --base-url http://127.0.0.1:8787 --title "Local session"
 ```
 
 ## MCP server
@@ -109,7 +144,7 @@ The image URL is reachable only from the same machine as the `opeco` process. Wh
 
 - Treat an unused pairing QR code or URL as a temporary secret.
 - Local QR images use an opaque, independently generated loopback URL. The URL contains no pairing data and expires after 10 minutes, but anyone who can view the image can use the underlying one-shot pairing secret.
-- Session management keys exist only in the CLI process memory and are not recoverable.
+- Interactive and MCP session management keys exist only in process memory. Shell sessions keep keys and authentication state in an OS temporary directory (`0700`) and file (`0600`) where those modes apply. Treat that file as a secret: anyone who can read it can control the session and decrypt its messages. Do not share, back up, or commit it. Cleanup is not secure erasure, and missing keys are not recoverable.
 - The relay can observe metadata such as timestamps, identifiers, and ciphertext sizes.
 - Attachment objects in R2 are ciphertext only. They are removed after `opeco` has advanced past the response and polls again, or when the session expires; an uploaded attachment that is never committed can remain until session expiry.
 - Compromise of the served web application, the browser profile, or the CLI process is outside the end-to-end encryption guarantee.

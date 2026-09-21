@@ -6,6 +6,50 @@ final class DeviceGroupFlowUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    func testLiveShellSessionRoundTrip() throws {
+        let link = ProcessInfo.processInfo.environment["OPECO_SHELL_PAIRING_URL"]
+        try XCTSkipUnless(link != nil, "Requires a live shell session and CLI event driver")
+        let app = XCUIApplication()
+        app.launch()
+        let scan = app.buttons["Scan QR code"].firstMatch
+        XCTAssertTrue(scan.waitForExistence(timeout: 30))
+        attachScreenshot(named: "shell-01-before-pairing", app: app)
+        scan.tap()
+        let field = app.textFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        field.typeText(link!)
+        app.buttons["Continue"].tap()
+
+        let permissionAlert = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.firstMatch
+        if permissionAlert.waitForExistence(timeout: 5) {
+            permissionAlert.buttons.element(boundBy: 0).tap()
+        }
+        app.activate()
+        XCTAssertTrue(app.staticTexts["Shell iPhone GUI"].waitForExistence(timeout: 45))
+        XCTAssertTrue(app.staticTexts["Shell build ready"].waitForExistence(timeout: 30))
+        attachScreenshot(named: "shell-02-status", app: app)
+        XCTAssertTrue(app.staticTexts["Shell notification"].waitForExistence(timeout: 30))
+        attachScreenshot(named: "shell-03-notification", app: app)
+        XCTAssertTrue(app.staticTexts["Continue shell work?"].waitForExistence(timeout: 30))
+        attachScreenshot(named: "shell-04-question", app: app)
+        app.buttons["Continue"].tap()
+        XCTAssertTrue(app.staticTexts["Response sent"].waitForExistence(timeout: 15))
+        attachScreenshot(named: "shell-05-response", app: app)
+        app.buttons["Send a message"].tap()
+        let editor = app.textViews["Message"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        editor.tap()
+        editor.typeText("Reply from iPhone shell test")
+        attachScreenshot(named: "shell-06-feedback", app: app)
+        app.buttons["Send"].tap()
+        wait(for: [absence(of: editor)], timeout: 15)
+        XCTAssertFalse(app.staticTexts["operation-error-message"].exists)
+        attachScreenshot(named: "shell-07-feedback-sent", app: app)
+        wait(for: [absence(of: app.staticTexts["Shell iPhone GUI"])], timeout: 45)
+        attachScreenshot(named: "shell-08-closed", app: app)
+    }
+
     func testEmptyStateNamesOpecoCLI() {
         let app = XCUIApplication()
         app.launchArguments = ["-ui-test-session-link", "-ui-test-empty-sessions"]
