@@ -14,6 +14,7 @@ import (
 )
 
 const maxResponseBytes = 2 << 20
+const maxErrorBodyBytes = 200
 
 type API struct {
 	baseURL *url.URL
@@ -221,6 +222,7 @@ func (a *API) attachment(ctx context.Context, sessionID, sessionToken, attachmen
 		return nil, err
 	}
 	request.Header.Set("Authorization", "Bearer "+sessionToken)
+	request.Header.Set("Accept", "application/octet-stream, application/json")
 	response, err := a.client.Do(request)
 	if err != nil {
 		return nil, &transientAPIError{err: err}
@@ -233,7 +235,7 @@ func (a *API) attachment(ctx context.Context, sessionID, sessionToken, attachmen
 		}
 		var apiError APIError
 		if err := decodeJSON(limited, &apiError); err != nil {
-			return nil, fmt.Errorf("decode attachment API error with status %d: %w", response.StatusCode, err)
+			return nil, unexpectedResponseError(response.StatusCode, limited)
 		}
 		apiError.Status = response.StatusCode
 		return nil, &apiError
@@ -280,6 +282,7 @@ func (a *API) do(ctx context.Context, method, path, token string, input, output 
 	if input != nil {
 		request.Header.Set("Content-Type", "application/json")
 	}
+	request.Header.Set("Accept", "application/json")
 	if token != "" {
 		request.Header.Set("Authorization", "Bearer "+token)
 	}
@@ -299,11 +302,11 @@ func (a *API) do(ctx context.Context, method, path, token string, input, output 
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		var apiError APIError
 		if err := decodeJSON(responseBody, &apiError); err != nil {
-			decodeErr := fmt.Errorf("decode API error with status %d: %w", response.StatusCode, err)
+			unexpectedErr := unexpectedResponseError(response.StatusCode, responseBody)
 			if isTransientHTTPStatus(response.StatusCode) {
-				return &transientAPIError{err: decodeErr}
+				return &transientAPIError{err: unexpectedErr}
 			}
-			return decodeErr
+			return unexpectedErr
 		}
 		apiError.Status = response.StatusCode
 		return &apiError
@@ -315,6 +318,13 @@ func (a *API) do(ctx context.Context, method, path, token string, input, output 
 		return nil
 	}
 	return decodeJSON(responseBody, output)
+}
+
+func unexpectedResponseError(status int, body []byte) error {
+	if len(body) > maxErrorBodyBytes {
+		return fmt.Errorf("opeco.link API: unexpected %d response: %q (first %d of %d bytes)", status, body[:maxErrorBodyBytes], maxErrorBodyBytes, len(body))
+	}
+	return fmt.Errorf("opeco.link API: unexpected %d response: %q", status, body)
 }
 
 func decodeJSON(data []byte, target any) error {

@@ -450,6 +450,21 @@ final class DeviceGroupFlowUITests: XCTestCase {
         attachScreenshot(named: "13-dismiss-error-keeps-request", app: app)
     }
 
+    func testUnexpectedErrorResponseShowsItsStatusAndBody() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-ui-test-session-history", "-ui-test-unexpected-response"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Continue the meeting?"].waitForExistence(timeout: 5))
+        app.buttons["Dismiss request"].tap()
+
+        let message = app.staticTexts["operation-error-message"]
+        XCTAssertTrue(message.waitForExistence(timeout: 5))
+        XCTAssertEqual(message.label, "opeco API: unexpected 500 response: \"error code: 1101\"")
+        XCTAssertTrue(app.staticTexts["Continue the meeting?"].exists)
+        attachScreenshot(named: "26-unexpected-error-response", app: app)
+    }
+
     func testSessionSyncErrorStaysOnTheCard() {
         let app = XCUIApplication()
         app.launchArguments = ["-ui-test-session-history", "-ui-test-session-sync-error"]

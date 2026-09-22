@@ -492,6 +492,24 @@ final class AppCommandExecutorTests: XCTestCase {
     }
 
     @MainActor
+    func testUnexpectedErrorResponseReportsItsStatusAndBody() async throws {
+        let (relay, driver, _) = try commandFixture()
+        try await driver.execute(
+            .joinSession(groupID: "ui-test-group", pairingURL: relay.pairingURL)
+        )
+        let model = AppModel(commandExecutor: driver.executor, initialState: driver.state)
+        relay.failPath = "/api/sessions/ui-test-joined-session/responses"
+        relay.failureResponse = (500, Data("error code: 1101".utf8))
+        await model.respond(sessionID: "ui-test-joined-session", requestID: "A", optionID: "yes")
+        XCTAssertEqual(model.errorMessage, "opeco API: unexpected 500 response: \"error code: 1101\"")
+
+        XCTAssertEqual(
+            UnexpectedResponseError(status: 502, body: Data(repeating: 0x78, count: 300)).errorDescription,
+            "opeco API: unexpected 502 response: \"\(String(repeating: "x", count: 200))\" (first 200 of 300 bytes)"
+        )
+    }
+
+    @MainActor
     private func commandFixture() throws -> (
         CommandUITestRelay, AppCommandTestDriver, AppCommandTestStorage
     ) {

@@ -173,6 +173,39 @@ func TestRetryEventOperationStopsWhenTheCallerCancels(t *testing.T) {
 	}
 }
 
+func TestSendToGroupResendsTheSameEnvelopeAfterATransientFailure(t *testing.T) {
+	delays := eventRetryDelays
+	eventRetryDelays = [...]time.Duration{0, 0}
+	defer func() { eventRetryDelays = delays }()
+
+	api, err := NewAPI("http://127.0.0.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var bodies [][]byte
+	api.client.Transport = roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		body, readErr := io.ReadAll(request.Body)
+		if readErr != nil {
+			return nil, readErr
+		}
+		bodies = append(bodies, body)
+		if len(bodies) == 1 {
+			return &http.Response{StatusCode: 500, Body: io.NopCloser(strings.NewReader("error code: 1101"))}, nil
+		}
+		return &http.Response{StatusCode: 201, Body: io.NopCloser(strings.NewReader(`{"expiresAt":1}`))}, nil
+	})
+
+	session := &managedSession{id: "session", sessionToken: "session-token", protocolVersion: 4}
+	group := &Group{ID: "group", Timestamp: 11, Keys: map[int64][]byte{11: make([]byte, 32)}}
+	value := event{ID: "item", Type: "notify", Message: "message"}
+	if err := NewStore(api).sendToGroup(context.Background(), session, group, value, "notify"); err != nil {
+		t.Fatal(err)
+	}
+	if len(bodies) != 2 || !bytes.Equal(bodies[0], bodies[1]) {
+		t.Fatalf("request bodies = %q, want the same envelope sent twice", bodies)
+	}
+}
+
 func TestV4ResponsesSkipStaleEpochAndAdvanceCursor(t *testing.T) {
 	actorKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {

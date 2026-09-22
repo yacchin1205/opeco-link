@@ -303,6 +303,8 @@ The Session-creating process records one immutable Event for a currently joined 
 
 When the Event introduces an actionable item, success also creates the corresponding SessionItem in `active` state. Recording the Event, creating the SessionItem, scheduling its notification behavior, and extending the Session lifetime are one observable result.
 
+Sending an Event that the Session already recorded, with the same identity and the same encrypted payload, succeeds without recording it again. A sender that cannot tell whether an Event was recorded therefore resends that Event unchanged. The same identity with any other content is rejected.
+
 ### `GET /api/sessions/:sessionId/events`
 
 Authentication: a `groupToken` for a Group joined to the named Session. Authorization: its Device MUST be a current member of that Group, the Session MUST be `open`, and the Group's current state MUST be usable by the Session.

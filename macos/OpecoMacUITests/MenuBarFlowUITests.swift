@@ -313,6 +313,25 @@ final class MenuBarFlowUITests: XCTestCase {
         attachScreenshot(named: "05-dismiss-error-keeps-request", app: app)
     }
 
+    func testUnexpectedErrorResponseShowsItsStatusAndBody() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-ui-test-session-history", "-ui-test-unexpected-response"]
+        app.launch()
+
+        let statusItem = app.menuBars.statusItems["opeco, 3 unresolved items"]
+        XCTAssertTrue(statusItem.waitForExistence(timeout: 5))
+        statusItem.click()
+
+        XCTAssertTrue(app.staticTexts["Continue the meeting?"].waitForExistence(timeout: 5))
+        app.buttons["Dismiss Request"].click()
+
+        let message = app.staticTexts["error-message"]
+        XCTAssertTrue(message.waitForExistence(timeout: 5))
+        XCTAssertEqual(message.value as? String, "opeco API: unexpected 500 response: \"error code: 1101\"")
+        XCTAssertTrue(app.staticTexts["Continue the meeting?"].exists)
+        attachScreenshot(named: "08-unexpected-error-response", app: app)
+    }
+
     func testManagementWindowsOpenFromMenuBar() {
         let app = XCUIApplication()
         app.launchArguments = ["-ui-test-session-history"]

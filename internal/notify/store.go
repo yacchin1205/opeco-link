@@ -913,12 +913,6 @@ func (s *Store) send(ctx context.Context, sessionID string, value event, notific
 }
 
 func (s *Store) sendToGroup(ctx context.Context, session *managedSession, group *Group, value event, notificationKind string) error {
-	return retryEventOperation(ctx, eventRetryDelays[:], func() error {
-		return s.sendToGroupOnce(ctx, session, group, value, notificationKind)
-	})
-}
-
-func (s *Store) sendToGroupOnce(ctx context.Context, session *managedSession, group *Group, value event, notificationKind string) error {
 	if group.Timestamp == 0 {
 		return fmt.Errorf("device group %q has no key available for new events", group.ID)
 	}
@@ -942,18 +936,21 @@ func (s *Store) sendToGroupOnce(ctx context.Context, session *managedSession, gr
 	if err != nil {
 		return err
 	}
-	return s.api.addEvent(
-		ctx,
-		session.id,
-		session.sessionToken,
-		envelopeID,
-		itemID,
-		group.ID,
-		group.Timestamp,
-		nonce,
-		ciphertext,
-		notificationKind,
-	)
+	// A retry resends the same envelope: the relay accepts an event it already stored, but rejects a second event for the same item.
+	return retryEventOperation(ctx, eventRetryDelays[:], func() error {
+		return s.api.addEvent(
+			ctx,
+			session.id,
+			session.sessionToken,
+			envelopeID,
+			itemID,
+			group.ID,
+			group.Timestamp,
+			nonce,
+			ciphertext,
+			notificationKind,
+		)
+	})
 }
 
 func retryEventOperation(ctx context.Context, delays []time.Duration, operation func() error) error {

@@ -384,12 +384,13 @@ struct APIClient {
         request.httpMethod = "PUT"
         request.timeoutInterval = 20
         request.httpBody = attachment.ciphertext
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("Bearer \(reservation.uploadToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
         let (data, response) = try await self.session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw ProtocolError.invalidResponse("API did not return HTTP") }
         guard data.count <= maximumResponseBytes else { throw ProtocolError.invalidResponse("body exceeds \(maximumResponseBytes) bytes") }
-        guard http.statusCode == 200 else { throw try apiError(status: http.statusCode, data: data) }
+        guard http.statusCode == 200 else { throw apiError(status: http.statusCode, data: data) }
         let fields = try object(data, keys: ["uploaded"])
         guard fields["uploaded"] as? Bool == true else { throw ProtocolError.invalidResponse("attachment upload was not confirmed") }
     }
@@ -405,18 +406,23 @@ struct APIClient {
             throw ProtocolError.invalidResponse("invalid API URL")
         }
         var request = URLRequest(url: url); request.httpMethod = method; request.timeoutInterval = 20; request.httpBody = body
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
         if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw ProtocolError.invalidResponse("API did not return HTTP") }
         guard data.count <= maximumResponseBytes else { throw ProtocolError.invalidResponse("body exceeds \(maximumResponseBytes) bytes") }
-        guard http.statusCode == expectedStatus else { throw try apiError(status: http.statusCode, data: data) }
+        guard http.statusCode == expectedStatus else { throw apiError(status: http.statusCode, data: data) }
         return data
     }
 
-    private func apiError(status: Int, data: Data) throws -> APIError {
-        let fields = try object(data, keys: ["error", "message"])
-        return APIError(status: status, code: try text(fields, "error"), message: try text(fields, "message"))
+    private func apiError(status: Int, data: Data) -> Error {
+        do {
+            let fields = try object(data, keys: ["error", "message"])
+            return APIError(status: status, code: try text(fields, "error"), message: try text(fields, "message"))
+        } catch {
+            return UnexpectedResponseError(status: status, body: data)
+        }
     }
 
     private func encode(_ value: [String: Any]) throws -> Data { try JSONSerialization.data(withJSONObject: value) }
@@ -454,6 +460,16 @@ struct APIClient {
 struct APIError: LocalizedError, Equatable {
     let status: Int; let code: String; let message: String
     var errorDescription: String? { "opeco API: \(code) (\(status)): \(message)" }
+}
+
+struct UnexpectedResponseError: LocalizedError, Equatable {
+    private static let maximumBodyBytes = 200
+    let status: Int; let body: Data
+    var errorDescription: String? {
+        let shown = String(decoding: body.prefix(Self.maximumBodyBytes), as: UTF8.self).debugDescription
+        let truncation = body.count > Self.maximumBodyBytes ? " (first \(Self.maximumBodyBytes) of \(body.count) bytes)" : ""
+        return "opeco API: unexpected \(status) response: \(shown)\(truncation)"
+    }
 }
 
 private struct GroupTransitionRequest: Encodable {

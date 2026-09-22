@@ -719,6 +719,10 @@ final class AppModel: ObservableObject, AppCommandStateOwner {
                 ProcessInfo.processInfo.arguments.contains("-ui-test-response-error") {
                 relay.failPath = "/api/sessions/ui-test-session/responses"
             }
+            if ProcessInfo.processInfo.arguments.contains("-ui-test-unexpected-response") {
+                relay.failPath = "/api/sessions/ui-test-session/responses"
+                relay.failureResponse = (500, Data("error code: 1101".utf8))
+            }
             if ProcessInfo.processInfo.arguments.contains("-ui-test-device-addition-error") {
                 relay.failPath = "/api/groups/ui-test-group/device-requests/ui-test-device-request/approve"
                 relay.failure = ProtocolError.invalidResponse("Device addition failed for UI testing")

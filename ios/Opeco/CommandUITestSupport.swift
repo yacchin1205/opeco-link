@@ -36,6 +36,7 @@ final class CommandUITestRelay {
     var requests: [(method: String, path: String, body: [String: Any])] = []
     var failPath: String?
     var failure: Error = URLError(.notConnectedToInternet)
+    var failureResponse: (Int, Data)?
     let expiresAt = Int64(Date().timeIntervalSince1970 * 1_000) + 86_400_000
 
     init() throws {
@@ -112,7 +113,10 @@ final class CommandUITestRelay {
             }
         }
         requests.append((method, path, body))
-        if path == failPath { throw failure }
+        if path == failPath {
+            if let failureResponse { return failureResponse }
+            throw failure
+        }
         func json(_ status: Int, _ object: [String: Any]) throws -> (Int, Data) {
             (status, try JSONSerialization.data(withJSONObject: object))
         }
