@@ -384,6 +384,7 @@ struct APIClient {
         request.httpMethod = "PUT"
         request.timeoutInterval = 20
         request.httpBody = attachment.ciphertext
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("Bearer \(reservation.uploadToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
         let (data, response) = try await self.session.data(for: request)
@@ -405,6 +406,7 @@ struct APIClient {
             throw ProtocolError.invalidResponse("invalid API URL")
         }
         var request = URLRequest(url: url); request.httpMethod = method; request.timeoutInterval = 20; request.httpBody = body
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
         if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
         let (data, response) = try await session.data(for: request)

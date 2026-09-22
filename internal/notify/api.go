@@ -222,6 +222,7 @@ func (a *API) attachment(ctx context.Context, sessionID, sessionToken, attachmen
 		return nil, err
 	}
 	request.Header.Set("Authorization", "Bearer "+sessionToken)
+	request.Header.Set("Accept", "application/octet-stream, application/json")
 	response, err := a.client.Do(request)
 	if err != nil {
 		return nil, &transientAPIError{err: err}
@@ -281,6 +282,7 @@ func (a *API) do(ctx context.Context, method, path, token string, input, output 
 	if input != nil {
 		request.Header.Set("Content-Type", "application/json")
 	}
+	request.Header.Set("Accept", "application/json")
 	if token != "" {
 		request.Header.Set("Authorization", "Bearer "+token)
 	}
