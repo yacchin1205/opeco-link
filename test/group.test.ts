@@ -190,6 +190,24 @@ describe("devices and persistent groups", () => {
     )).toBe(2);
   });
 
+  it("accepts a resent event without an item and stores it once", async () => {
+    const device = await newDevice();
+    const group = await createGroup(device);
+    const key = await registerKey(group.id, device, [device], true);
+    const session = await createJoinedSession(group, device, key);
+    const eventId = randomId();
+    const ciphertext = randomToken();
+
+    expect((await postEvent(session, key.timestamp, "status", eventId, ciphertext)).status).toBe(201);
+    expect((await postEvent(session, key.timestamp, "status", eventId, ciphertext)).status).toBe(201);
+    const conflicting = await postEvent(session, key.timestamp, "status", eventId);
+    expect(conflicting.status).toBe(409);
+    expect(conflicting.json.error).toBe("event_exists");
+    expect((await events(session, device)).json.events).toEqual([
+      expect.objectContaining({ eventId, ciphertext }),
+    ]);
+  });
+
   it.each([true, false])("migrates stored responses with an existing attachment column: %s", async (hasAttachmentColumn) => {
     const device = await newDevice();
     const { group, key } = await createV4Group(device);
@@ -1453,8 +1471,13 @@ async function establishSessionParticipation(
   return stub;
 }
 
-async function postEvent(session: JoinedSession, keyTimestamp: number, notificationKind = "notify") {
-  const eventId = randomId();
+async function postEvent(
+  session: JoinedSession,
+  keyTimestamp: number,
+  notificationKind = "notify",
+  eventId = randomId(),
+  ciphertext = randomToken(),
+) {
   const result = await api(`/api/sessions/${session.id}/events`, {
     method: "POST",
     token: session.sessionToken,
@@ -1463,7 +1486,7 @@ async function postEvent(session: JoinedSession, keyTimestamp: number, notificat
       groupId: session.groupId,
       keyTimestamp,
       nonce: "A".repeat(16),
-      ciphertext: randomToken(),
+      ciphertext,
       notificationKind,
     },
   });

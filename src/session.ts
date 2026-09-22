@@ -487,15 +487,15 @@ export class Session extends DurableObject<SessionEnv> {
       throw new HttpError(400, "invalid_field", "Status events cannot contain an item ID");
     }
     const group = this.requireGroup(groupId);
-    if (itemId !== null) {
-      const existing = this.eventById(eventId);
-      if (existing !== null) {
-        if (
-          existing.item_id !== itemId || existing.group_id !== groupId ||
-          existing.key_timestamp !== keyTimestamp || existing.nonce !== nonce || existing.ciphertext !== ciphertext
-        ) {
-          throw new HttpError(409, "event_exists", "Event ID is already used by another event");
-        }
+    const existing = this.eventById(eventId);
+    if (existing !== null) {
+      if (
+        existing.item_id !== itemId || existing.group_id !== groupId ||
+        existing.key_timestamp !== keyTimestamp || existing.nonce !== nonce || existing.ciphertext !== ciphertext
+      ) {
+        throw new HttpError(409, "event_exists", "Event ID is already used by another event");
+      }
+      if (itemId !== null) {
         const item = this.requiredItem(itemId);
         if (item.notification_kind !== notificationKind) {
           throw new HttpError(409, "item_kind_changed", "Session item notification kind changed between groups");
@@ -508,9 +508,9 @@ export class Session extends DurableObject<SessionEnv> {
             this.eventRecipients(eventId),
           );
         }
-        await this.scheduleNextAlarm(meta.expires_at);
-        return json({ expiresAt: meta.expires_at }, 201);
       }
+      await this.scheduleNextAlarm(meta.expires_at);
+      return json({ expiresAt: meta.expires_at }, 201);
     }
     const recipients = await this.groupKeyRecipients(group, keyTimestamp, meta.protocol_version);
     const now = Date.now();
