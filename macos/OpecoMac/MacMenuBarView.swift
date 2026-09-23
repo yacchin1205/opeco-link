@@ -78,6 +78,19 @@ struct MacMenuBarView: View {
         } else {
             ScrollView {
                 LazyVStack(spacing: 12) {
+#if DEBUG
+                    if model.isSyncRecoveryUITest {
+                        Button("Restore test connection") {
+                            CommandUITestTransport.relay.syncFailurePath = nil
+                        }
+                    }
+#endif
+                    if let error = model.sharedSyncError {
+                        Label(error, systemImage: "exclamationmark.triangle")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                            .accessibilityIdentifier("shared-sync-error")
+                    }
                     if let error = model.errorMessage {
                         MacErrorBanner(message: error)
                     }

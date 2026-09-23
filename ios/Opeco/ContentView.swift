@@ -20,7 +20,18 @@ struct ContentView: View {
                     GeometryReader { geometry in
                         ScrollView {
                             LazyVStack(spacing: 16) {
+                                if let error = model.sharedSyncError {
+                                    Label(error, systemImage: "exclamationmark.triangle")
+                                        .font(.caption)
+                                        .foregroundStyle(.orange)
+                                        .accessibilityIdentifier("shared-sync-error")
+                                }
 #if DEBUG
+                                if model.isSyncRecoveryUITest {
+                                    Button("Restore test connection") {
+                                        CommandUITestTransport.relay.syncFailurePath = nil
+                                    }
+                                }
                                 if model.isAppBadgeUITest {
                                     Button("Enable notifications for UI test") {
                                         Task { await model.enableNotifications() }
@@ -129,15 +140,10 @@ struct ContentView: View {
                 Text(model.noticeMessage ?? "")
             }
             .task { await model.start() }
-            .task(id: model.isReady) {
-                guard model.isReady else { return }
-                await model.runSyncLoop()
-            }
-            .onChange(of: scenePhase) { _, phase in
-                guard phase == .active else { return }
-                Task {
-                    await model.sync()
-                    await model.resumeNotifications()
+            .onChange(of: scenePhase, initial: true) { _, phase in
+                model.setAutomaticSyncEnabled(phase == .active)
+                if phase == .active {
+                    Task { await model.resumeNotifications() }
                 }
             }
         }

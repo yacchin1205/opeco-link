@@ -6,6 +6,64 @@ final class DeviceGroupFlowUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    func testLiveDeviceLaunchAndResume() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["OPECO_LIVE_DEVICE"] == "1",
+                          "Requires the installed app's existing device registration")
+        let app = XCUIApplication()
+        app.launch()
+        XCTAssertTrue(app.staticTexts["Current"].waitForExistence(timeout: 30))
+        XCTAssertFalse(app.staticTexts["shared-sync-error"].exists)
+        XCTAssertFalse(app.staticTexts["session-sync-error"].exists)
+        attachScreenshot(named: "device-01-synchronized", app: app)
+        XCUIDevice.shared.press(.home)
+        app.activate()
+        XCTAssertTrue(app.staticTexts["Current"].waitForExistence(timeout: 30))
+        XCTAssertFalse(app.staticTexts["shared-sync-error"].exists)
+        XCTAssertFalse(app.staticTexts["session-sync-error"].exists)
+        attachScreenshot(named: "device-02-resumed", app: app)
+    }
+
+    func testSessionSyncRecoversAfterForegroundingWithoutClearingOperationError() {
+        checkSyncRecovery(shared: false)
+    }
+
+    func testSharedSyncRecoversDuringPeriodicRefresh() {
+        checkSyncRecovery(shared: true)
+    }
+
+    private func checkSyncRecovery(shared: Bool) {
+        let app = XCUIApplication()
+        app.launchArguments = ["-ui-test-session-history", "-ui-test-sync-recovery", "-ui-test-response-error"]
+        if shared { app.launchArguments.append("-ui-test-shared-sync-error") }
+        app.launch()
+        let syncError = app.staticTexts[shared ? "shared-sync-error" : "session-sync-error"]
+        XCTAssertTrue(syncError.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["operation-error-message"].exists)
+        attachScreenshot(named: "sync-01-failed", app: app)
+        app.buttons["Yes"].tap()
+        let operationError = app.staticTexts["operation-error-message"]
+        XCTAssertTrue(operationError.waitForExistence(timeout: 5))
+        let failure = operationError.label
+        XCTAssertTrue(syncError.exists)
+        attachScreenshot(named: "sync-02-operation-failed", app: app)
+        if !shared {
+            XCUIDevice.shared.press(.home)
+            app.activate()
+            XCTAssertTrue(syncError.waitForExistence(timeout: 5))
+            attachScreenshot(named: "sync-03-still-offline-after-resume", app: app)
+        }
+        app.buttons["Restore test connection"].tap()
+        if !shared {
+            XCUIDevice.shared.press(.home)
+            app.activate()
+        }
+        wait(for: [absence(of: syncError)], timeout: 10)
+        XCTAssertTrue(app.staticTexts["Current"].waitForExistence(timeout: 5))
+        XCTAssertEqual(operationError.label, failure)
+        XCTAssertTrue(app.staticTexts["Continue the meeting?"].exists)
+        attachScreenshot(named: "sync-04-recovered-operation-error-retained", app: app)
+    }
+
     func testLiveShellSessionRoundTrip() throws {
         let link = ProcessInfo.processInfo.environment["OPECO_SHELL_PAIRING_URL"]
         try XCTSkipUnless(link != nil, "Requires a live shell session and CLI event driver")
