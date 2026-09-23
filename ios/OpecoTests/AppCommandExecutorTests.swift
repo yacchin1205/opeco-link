@@ -1,3 +1,4 @@
+import Combine
 import CryptoKit
 import Foundation
 import XCTest
@@ -104,7 +105,8 @@ final class AppCommandExecutorTests: XCTestCase {
         let executor = fixture.executor(storage: storage)
         let base = AppCommandTestTransport.response!
         let started = expectation(description: "automatic sync started")
-        let resumed = expectation(description: "sync resumed")
+        let finished = expectation(description: "in-flight sync finished")
+        let resumed = expectation(description: "resumed sync finished")
         let unexpected = expectation(description: "no requests while paused")
         unexpected.isInverted = true
         let release = DispatchSemaphore(value: 0)
@@ -120,25 +122,35 @@ final class AppCommandExecutorTests: XCTestCase {
                     guard release.wait(timeout: .now() + 5) == .success else {
                         throw ProtocolError.invalidResponse("sync was not released by test")
                     }
-                } else { resumed.fulfill() }
+                }
             }
             return try base(request)
         }
         let model = AppModel(commandExecutor: executor, initialState: fixture.commandState())
-        defer { model.setAutomaticSyncEnabled(false) }
+        let completions = model.$connectionState.dropFirst().filter { $0 == .current }
+        let firstCompletion = completions.prefix(1).sink { _ in finished.fulfill() }
+        let resumedCompletion = completions.dropFirst().prefix(1).sink { _ in
+            model.setAutomaticSyncEnabled(false)
+            resumed.fulfill()
+        }
+        defer {
+            model.setAutomaticSyncEnabled(false)
+            firstCompletion.cancel()
+            resumedCompletion.cancel()
+        }
         model.setAutomaticSyncEnabled(true)
         await fulfillment(of: [started], timeout: 2)
         model.setAutomaticSyncEnabled(false)
         paused = true
         release.signal()
-        await model.sync()
+        await fulfillment(of: [finished], timeout: 2)
         XCTAssertEqual(model.connectionState, .current)
         XCTAssertEqual(model.sessions.first?.status, "Updated by sync")
         await fulfillment(of: [unexpected], timeout: 2.5)
         paused = false
         model.setAutomaticSyncEnabled(true)
         await fulfillment(of: [resumed], timeout: 2)
-        await model.sync()
+        XCTAssertEqual(model.connectionState, .current)
         XCTAssertEqual(eventRequests, 2)
     }
 
