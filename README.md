@@ -182,3 +182,12 @@ GoReleaser builds archives for Linux, macOS, and Windows on amd64 and arm64. Pus
 git tag v2026.8.0
 git push origin v2026.8.0
 ```
+
+## License
+
+Copyright 2026 Satoshi Yazawa.
+
+Licensed under the [Apache License, Version 2.0](LICENSE).
+Third-party dependencies retain their respective licenses.
+CLI release archives include their license texts and notices in `licenses/`,
+collected from the dependencies for each build target.

@@ -19,6 +19,13 @@ builds:
     goarch:
       - amd64
       - arm64
+    hooks:
+      post:
+        - cmd: sh scripts/collect-cli-licenses.sh "dist/licenses/{{ .Os }}_{{ .Arch }}"
+          output: true
+          env:
+            - GOOS={{ .Os }}
+            - GOARCH={{ .Arch }}
 
 archives:
   - formats:
@@ -27,6 +34,11 @@ archives:
       - goos: windows
         formats:
           - zip
+    files:
+      - LICENSE
+      - README.md
+      - src: "dist/licenses/{{ .Os }}_{{ .Arch }}"
+        dst: licenses
 
 checksum:
   name_template: checksums.txt
