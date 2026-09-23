@@ -35,6 +35,7 @@ final class CommandUITestRelay {
     var groups: [String: DeviceGroupStateResult]
     var requests: [(method: String, path: String, body: [String: Any])] = []
     var failPath: String?
+    var syncFailurePath: String?
     var failure: Error = URLError(.notConnectedToInternet)
     var failureResponse: (Int, Data)?
     let expiresAt = Int64(Date().timeIntervalSince1970 * 1_000) + 86_400_000
@@ -113,6 +114,7 @@ final class CommandUITestRelay {
             }
         }
         requests.append((method, path, body))
+        if path == syncFailurePath { throw URLError(.notConnectedToInternet) }
         if path == failPath {
             if let failureResponse { return failureResponse }
             throw failure

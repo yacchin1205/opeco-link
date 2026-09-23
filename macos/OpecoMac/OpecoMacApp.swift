@@ -174,11 +174,17 @@ final class MacRuntime: ObservableObject {
     func start() {
         guard !started else { return }
         started = true
+        let notifications = NSWorkspace.shared.notificationCenter
+        notifications.addObserver(self, selector: #selector(willSleep), name: NSWorkspace.willSleepNotification, object: nil)
+        notifications.addObserver(self, selector: #selector(didWake), name: NSWorkspace.didWakeNotification, object: nil)
+        model.setAutomaticSyncEnabled(true)
         Task {
             await model.start()
-            await model.runSyncLoop()
         }
     }
+
+    @objc private func willSleep() { model.setAutomaticSyncEnabled(false) }
+    @objc private func didWake() { model.setAutomaticSyncEnabled(true) }
 
     func open(_ url: URL) {
         start()

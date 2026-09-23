@@ -1,6 +1,11 @@
 import Foundation
 import OSLog
 
+enum SyncFailureScope: Hashable {
+    case shared
+    case session(String)
+}
+
 @MainActor
 final class AppModel: ObservableObject, AppCommandStateOwner {
     var sessions: [SessionRecord] {
@@ -23,7 +28,14 @@ final class AppModel: ObservableObject, AppCommandStateOwner {
         operationErrors.isEmpty ? nil : operationErrors.joined(separator: "\n\n")
     }
     @Published var noticeMessage: String?
-    @Published private(set) var sessionSyncErrors: [String: String] = [:]
+    @Published private(set) var syncFailures: [SyncFailureScope: Error] = [:]
+    var sharedSyncError: String? { syncFailures[.shared]?.localizedDescription }
+    var sessionSyncErrors: [String: String] {
+        Dictionary(uniqueKeysWithValues: syncFailures.compactMap { scope, error in
+            guard case .session(let id) = scope else { return nil }
+            return (id, error.localizedDescription)
+        })
+    }
 
     private let keychain = KeychainVault()
     private let commandQueue: AppCommandQueue
@@ -36,6 +48,9 @@ final class AppModel: ObservableObject, AppCommandStateOwner {
     private var pendingUniversalLinkTask: Task<Void, Never>?
     private var hasFinishedStarting = false
     private var didReportDisabledBadges = false
+    private var syncTask: Task<Void, Never>?
+    private var automaticSyncTask: Task<Void, Never>?
+    private var automaticSyncEnabled = false
 
     init(
         commandExecutor: AppCommandExecutor? = nil,
@@ -132,6 +147,14 @@ final class AppModel: ObservableObject, AppCommandStateOwner {
 #endif
     }
 
+    var isSyncRecoveryUITest: Bool {
+#if DEBUG
+        ProcessInfo.processInfo.arguments.contains("-ui-test-sync-recovery")
+#else
+        false
+#endif
+    }
+
     var isAwaitingDeviceApproval: Bool { pendingDeviceRequest != nil }
     var deviceCount: Int { max(1, groupDevices.count) }
     var isSharingAcrossDevices: Bool { groupDevices.count > 1 }
@@ -179,7 +202,7 @@ final class AppModel: ObservableObject, AppCommandStateOwner {
                 keychain.load(), groupState: groupState, stateOwner: self
             )
             isReady = true
-            await sync()
+            setAutomaticSyncEnabled(automaticSyncEnabled)
             await PushCoordinator.shared.resumeIfAuthorized()
             hasFinishedStarting = true
             await openPendingUniversalLink()
@@ -193,8 +216,23 @@ final class AppModel: ObservableObject, AppCommandStateOwner {
         }
     }
 
-    func runSyncLoop() async {
-        guard !isSessionHistoryUITest, !isDeviceAdditionApprovalUITest, !isSessionLinkUITest else { return }
+    func setAutomaticSyncEnabled(_ enabled: Bool) {
+        automaticSyncEnabled = enabled
+        if !enabled {
+            automaticSyncTask?.cancel()
+            automaticSyncTask = nil
+            return
+        }
+        guard isReady, automaticSyncTask == nil else { return }
+        automaticSyncTask = Task {
+            await syncTask?.value
+            await runSyncLoop()
+        }
+    }
+
+    private func runSyncLoop() async {
+        guard !isSessionHistoryUITest || isSyncRecoveryUITest else { return }
+        guard !isDeviceAdditionApprovalUITest, !isSessionLinkUITest else { return }
         while !Task.isCancelled {
             await sync()
             do { try await Task.sleep(for: .seconds(2)) }
@@ -216,6 +254,8 @@ final class AppModel: ObservableObject, AppCommandStateOwner {
             _ = try PairingLink(value)
             let groupID = try requiredGroupID()
             try await executeCommand(.joinSession(groupID: groupID, pairingURL: value))
+            await syncTask?.value
+            await sync()
             await enableNotifications()
             return true
         } catch { show(error); return false }
@@ -245,6 +285,8 @@ final class AppModel: ObservableObject, AppCommandStateOwner {
             let groupID = try requiredGroupID()
             try await executeCommand(.approveDeviceAddition(groupID: groupID, requestURL: link))
             if clearPendingOnSuccess { clearPendingDeviceAddition() }
+            await syncTask?.value
+            await sync()
             return true
         } catch {
             show(error)
@@ -428,9 +470,23 @@ final class AppModel: ObservableObject, AppCommandStateOwner {
     }
 
     func sync() async {
-        guard !isSessionHistoryUITest, !isRecoverableStartupFailureUITest, !isMixedSessionInheritanceUITest,
+        guard !isSessionHistoryUITest || isSyncRecoveryUITest else { return }
+        guard !isRecoverableStartupFailureUITest, !isMixedSessionInheritanceUITest,
               !isDeviceAdditionApprovalUITest, !isSessionLinkUITest else { return }
         guard isReady else { return }
+        if let syncTask {
+            await syncTask.value
+            return
+        }
+        let task = Task {
+            await performSync()
+            syncTask = nil
+        }
+        syncTask = task
+        await task.value
+    }
+
+    private func performSync() async {
         let previousConnectionState = connectionState
         connectionState = .syncing
         defer {
@@ -438,12 +494,17 @@ final class AppModel: ObservableObject, AppCommandStateOwner {
         }
         do {
             try await executeCommand(.synchronize)
+            syncFailures.removeAll()
             connectionState = .current
         } catch where Task.isCancelled && Self.isCancellation(error) {
             connectionState = previousConnectionState
             return
+        } catch let error as SessionSynchronizationError {
+            syncFailures[.session(error.sessionID)] = error.underlyingError
+            connectionState = .failed
         } catch {
-            show(error)
+            syncFailures[.shared] = error
+            connectionState = .failed
         }
         do {
             deviceRequestLink = try pendingDeviceRequest.map(deviceRequestURL)
@@ -476,14 +537,7 @@ final class AppModel: ObservableObject, AppCommandStateOwner {
     }
 
     private func executeCommand(_ command: AppCommand) async throws {
-        sessionSyncErrors = [:]
-        let result: AppCommandResult
-        do {
-            result = try await commandQueue.execute(command, stateOwner: self)
-        } catch let error as SessionSynchronizationError {
-            sessionSyncErrors[error.sessionID] = error.underlyingError.localizedDescription
-            throw error
-        }
+        let result = try await commandQueue.execute(command, stateOwner: self)
         for change in result.changes {
             switch change {
             case .deviceAdded:
@@ -549,7 +603,6 @@ final class AppModel: ObservableObject, AppCommandStateOwner {
 
     private func show(_ error: Error) {
         reportError(error.localizedDescription)
-        connectionState = .failed
     }
 
     func reportError(_ message: String) {
@@ -715,6 +768,10 @@ final class AppModel: ObservableObject, AppCommandStateOwner {
         do {
             let relay = try CommandUITestRelay()
             CommandUITestTransport.relay = relay
+            if isSyncRecoveryUITest {
+                relay.syncFailurePath = ProcessInfo.processInfo.arguments.contains("-ui-test-shared-sync-error")
+                    ? "/api/groups/ui-test-group/state" : "/api/sessions/ui-test-session/events"
+            }
             if ProcessInfo.processInfo.arguments.contains("-ui-test-dismiss-error") ||
                 ProcessInfo.processInfo.arguments.contains("-ui-test-response-error") {
                 relay.failPath = "/api/sessions/ui-test-session/responses"
@@ -787,7 +844,7 @@ final class AppModel: ObservableObject, AppCommandStateOwner {
             let current = Vault(version: 4, identity: identity, sessions: uiTestSessions)
             vault = current
             if ProcessInfo.processInfo.arguments.contains("-ui-test-session-sync-error") {
-                sessionSyncErrors[session.sessionID] = "Invalid server response: object fields do not match the protocol"
+                syncFailures[.session(session.sessionID)] = ProtocolError.invalidResponse("object fields do not match the protocol")
             }
             guard let authenticatedGroupState = relay.groups[group.groupID] else {
                 throw ProtocolError.invalidResponse("UI test group state is unavailable")
@@ -796,6 +853,7 @@ final class AppModel: ObservableObject, AppCommandStateOwner {
             connectionState = .current
             isReady = true
             hasFinishedStarting = true
+            setAutomaticSyncEnabled(automaticSyncEnabled)
         } catch {
             failStartup(error.localizedDescription, canReset: false)
         }

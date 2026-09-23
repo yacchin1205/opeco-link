@@ -7,6 +7,40 @@ final class MenuBarFlowUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    func testSessionSyncRecoversWithoutClearingOperationError() {
+        checkSyncRecovery(shared: false)
+    }
+
+    func testSharedSyncRecoversDuringPeriodicRefresh() {
+        checkSyncRecovery(shared: true)
+    }
+
+    private func checkSyncRecovery(shared: Bool) {
+        let app = XCUIApplication()
+        app.launchArguments = ["-ui-test-session-history", "-ui-test-sync-recovery", "-ui-test-response-error"]
+        if shared { app.launchArguments.append("-ui-test-shared-sync-error") }
+        app.launch()
+        let status = app.menuBars.statusItems["opeco, sync error"]
+        XCTAssertTrue(status.waitForExistence(timeout: 10))
+        status.click()
+        let syncError = app.staticTexts[shared ? "shared-sync-error" : "session-sync-error"]
+        XCTAssertTrue(syncError.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["error-message"].exists)
+        attachScreenshot(named: "sync-01-failed", app: app)
+        app.buttons["Yes"].click()
+        let operationError = app.staticTexts["error-message"]
+        XCTAssertTrue(operationError.waitForExistence(timeout: 5))
+        let failure = operationError.label
+        XCTAssertTrue(syncError.exists)
+        attachScreenshot(named: "sync-02-operation-failed", app: app)
+        app.buttons["Restore test connection"].click()
+        wait(for: [absence(of: syncError)], timeout: 10)
+        XCTAssertTrue(app.staticTexts["Current"].waitForExistence(timeout: 5))
+        XCTAssertEqual(operationError.label, failure)
+        XCTAssertTrue(app.staticTexts["Continue the meeting?"].exists)
+        attachScreenshot(named: "sync-03-recovered-operation-error-retained", app: app)
+    }
+
     func testResponseAndFeedbackCommandsCompleteInTheUI() {
         let app = XCUIApplication()
         app.launchArguments = ["-ui-test-session-history"]

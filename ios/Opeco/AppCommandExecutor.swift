@@ -42,12 +42,12 @@ final class AppCommandExecutor {
             let nextState = try await joinSession(
                 groupID: groupID, pairingURL: pairingURL, state: initialState
             )
-            return try await synchronize(state: nextState)
+            return AppCommandResult(nextState: nextState, changes: [])
         case .approveDeviceAddition(let groupID, let requestURL):
             let nextState = try await approveDeviceAddition(
                 groupID: groupID, requestURL: requestURL, state: initialState
             )
-            return try await synchronize(state: nextState)
+            return AppCommandResult(nextState: nextState, changes: [])
         case .prepareDeviceGroupJoin(let groupID, let discardSavedSessions):
             let nextState = try await prepareDeviceGroupJoin(
                 groupID: groupID, discardSavedSessions: discardSavedSessions,

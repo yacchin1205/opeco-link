@@ -19,19 +19,23 @@ final class AppCommandExecutorTests: XCTestCase {
     }
 
     @MainActor
-    func testModelSyncKeepsFailureVisibleAfterLaterSuccess() async throws {
+    func testModelSyncClearsFailureAfterRecovery() async throws {
         let fixture = try AppCommandFixture()
         let storage = AppCommandTestStorage()
         let executor = fixture.executor(storage: storage, networkFailure: true)
         let model = AppModel(commandExecutor: executor, initialState: fixture.commandState())
         await model.sync()
         XCTAssertEqual(model.connectionState, .failed)
-        let failure = try XCTUnwrap(model.errorMessage)
+        XCTAssertNotNil(model.sharedSyncError)
+        XCTAssertNil(model.errorMessage)
+        await model.sync()
+        XCTAssertEqual(model.syncFailures.count, 1)
         _ = fixture.executor(storage: storage)
         await model.sync()
         XCTAssertEqual(model.connectionState, .current)
         XCTAssertEqual(model.sessions.first?.status, "Updated by sync")
-        XCTAssertEqual(model.errorMessage, failure)
+        XCTAssertTrue(model.syncFailures.isEmpty)
+        XCTAssertNil(model.errorMessage)
     }
 
     @MainActor
@@ -44,7 +48,98 @@ final class AppCommandExecutorTests: XCTestCase {
         XCTAssertEqual(model.connectionState, .failed)
         XCTAssertEqual(model.sessions.first { $0.sessionID == "good" }?.status, "Connected")
         XCTAssertNotNil(model.sessionSyncErrors["bad"])
-        XCTAssertNotNil(model.errorMessage)
+        XCTAssertNil(model.errorMessage)
+        XCTAssertNil(model.sharedSyncError)
+
+        _ = fixture.executor(storage: storage, badSession: "good")
+        await model.sync()
+        XCTAssertEqual(Set(model.sessionSyncErrors.keys), ["bad", "good"])
+
+        _ = fixture.executor(storage: storage)
+        await model.sync()
+        XCTAssertTrue(model.syncFailures.isEmpty)
+        XCTAssertEqual(model.connectionState, .current)
+    }
+
+    @MainActor
+    func testConcurrentRefreshesShareOneSynchronization() async throws {
+        let fixture = try AppCommandFixture()
+        let storage = AppCommandTestStorage()
+        let executor = fixture.executor(storage: storage)
+        let base = AppCommandTestTransport.response!
+        let started = expectation(description: "sync request started")
+        let submitted = expectation(description: "second refresh submitted")
+        let release = DispatchSemaphore(value: 0)
+        defer { release.signal() }
+        var eventRequests = 0
+        AppCommandTestTransport.response = { request in
+            if request.url!.path.hasSuffix("/events") {
+                eventRequests += 1
+                started.fulfill()
+                guard release.wait(timeout: .now() + 5) == .success else {
+                    throw ProtocolError.invalidResponse("sync was not released by test")
+                }
+            }
+            return try base(request)
+        }
+        let model = AppModel(commandExecutor: executor, initialState: fixture.commandState())
+        let first = Task { await model.sync() }
+        await fulfillment(of: [started], timeout: 2)
+        let second = Task {
+            submitted.fulfill()
+            await model.sync()
+        }
+        await fulfillment(of: [submitted], timeout: 2)
+        release.signal()
+        await first.value
+        await second.value
+        XCTAssertEqual(eventRequests, 1)
+        XCTAssertEqual(model.connectionState, .current)
+    }
+
+    @MainActor
+    func testAutomaticSyncFinishesInFlightWorkAndWaitsForResume() async throws {
+        let fixture = try AppCommandFixture()
+        let storage = AppCommandTestStorage()
+        let executor = fixture.executor(storage: storage)
+        let base = AppCommandTestTransport.response!
+        let started = expectation(description: "automatic sync started")
+        let resumed = expectation(description: "sync resumed")
+        let unexpected = expectation(description: "no requests while paused")
+        unexpected.isInverted = true
+        let release = DispatchSemaphore(value: 0)
+        defer { release.signal() }
+        var eventRequests = 0
+        var paused = false
+        AppCommandTestTransport.response = { request in
+            if paused { unexpected.fulfill() }
+            if request.url!.path.hasSuffix("/events") {
+                eventRequests += 1
+                if eventRequests == 1 {
+                    started.fulfill()
+                    guard release.wait(timeout: .now() + 5) == .success else {
+                        throw ProtocolError.invalidResponse("sync was not released by test")
+                    }
+                } else { resumed.fulfill() }
+            }
+            return try base(request)
+        }
+        let model = AppModel(commandExecutor: executor, initialState: fixture.commandState())
+        defer { model.setAutomaticSyncEnabled(false) }
+        model.setAutomaticSyncEnabled(true)
+        await fulfillment(of: [started], timeout: 2)
+        model.setAutomaticSyncEnabled(false)
+        paused = true
+        release.signal()
+        await model.sync()
+        XCTAssertEqual(model.connectionState, .current)
+        XCTAssertEqual(model.sessions.first?.status, "Updated by sync")
+        await fulfillment(of: [unexpected], timeout: 2.5)
+        paused = false
+        model.setAutomaticSyncEnabled(true)
+        await fulfillment(of: [resumed], timeout: 2)
+        await model.sync()
+        XCTAssertEqual(eventRequests, 2)
     }
 
     @MainActor
@@ -173,6 +268,7 @@ final class AppCommandExecutorTests: XCTestCase {
     @MainActor
     func testJoinStoresSpecifiedSessionAndAuthenticatedKeys() async throws {
         let (relay, driver, storage) = try commandFixture()
+        relay.failPath = "/api/sessions/ui-test-joined-session/events"
         try await driver.execute(
             .joinSession(groupID: "ui-test-group", pairingURL: relay.pairingURL)
         )
@@ -181,6 +277,22 @@ final class AppCommandExecutorTests: XCTestCase {
         XCTAssertFalse(session.keys.isEmpty)
         XCTAssertEqual(session.expiresAt, relay.expiresAt)
         XCTAssertEqual(storage.saved.last, driver.state.vault)
+    }
+
+    @MainActor
+    func testApprovalSucceedsWhenFollowingSyncFails() async throws {
+        let (relay, driver, _) = try commandFixture()
+        try await driver.execute(.joinSession(groupID: "ui-test-group", pairingURL: relay.pairingURL))
+        let model = AppModel(commandExecutor: driver.executor, initialState: driver.state)
+        relay.failPath = "/api/sessions/ui-test-joined-session/events"
+        let staged = await model.join(link: relay.requestURL)
+        XCTAssertTrue(staged)
+        let approved = await model.approvePendingDeviceAddition()
+        XCTAssertTrue(approved)
+        XCTAssertFalse(model.isDeviceAdditionApprovalPending)
+        XCTAssertEqual(model.groupDevices.count, 2)
+        XCTAssertNotNil(model.sessionSyncErrors["ui-test-joined-session"])
+        XCTAssertNil(model.errorMessage)
     }
 
     @MainActor
@@ -385,17 +497,30 @@ final class AppCommandExecutorTests: XCTestCase {
         relay.failPath = "/api/sessions/ui-test-joined-session/responses"
         await model.respond(sessionID: "ui-test-joined-session", requestID: "A", optionID: "yes")
         XCTAssertNotNil(model.errorMessage)
+        XCTAssertEqual(model.sessions, initialSessions)
         model.dismissError()
         let result = await model.sendFeedback(sessionID: "ui-test-joined-session", message: "message")
         XCTAssertEqual(result, .unknown)
-        XCTAssertNotNil(model.errorMessage)
+        let sendFailure = try XCTUnwrap(model.errorMessage)
+        relay.syncFailurePath = "/api/sessions/ui-test-joined-session/events"
+        await model.sync()
+        XCTAssertNotNil(model.sessionSyncErrors["ui-test-joined-session"])
+        relay.syncFailurePath = nil
+        let changedAttention = await model.setAttention(sessionID: "ui-test-joined-session", attention: true)
+        XCTAssertTrue(changedAttention)
+        XCTAssertNotNil(model.sessionSyncErrors["ui-test-joined-session"])
+        await model.sync()
+        XCTAssertTrue(model.syncFailures.isEmpty)
+        XCTAssertEqual(model.errorMessage, sendFailure)
+        XCTAssertEqual(model.connectionState, .current)
         model.dismissError()
         relay.failPath = nil
+        let savedSessions = model.sessions
         storage.fail = true
         let changed = await model.setAttention(sessionID: "ui-test-joined-session", attention: true)
         XCTAssertFalse(changed)
         XCTAssertNotNil(model.errorMessage)
-        XCTAssertEqual(model.sessions, initialSessions)
+        XCTAssertEqual(model.sessions, savedSessions)
     }
 
     @MainActor

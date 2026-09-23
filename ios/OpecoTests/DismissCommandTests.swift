@@ -65,8 +65,8 @@ final class DismissCommandTests: XCTestCase {
         await fulfillment(of: [posted], timeout: 2)
         XCTAssertEqual(model.sessions.first?.request?.id, syncFails ? nil : "B")
         XCTAssertEqual(storage.saved.last?.sessions.first?.request?.id, syncFails ? nil : "B")
-        if syncFails { XCTAssertNotNil(model.errorMessage) }
-        else { XCTAssertNil(model.errorMessage) }
+        XCTAssertNil(model.errorMessage)
+        XCTAssertEqual(model.sessionSyncErrors["session"] != nil, syncFails)
     }
 
     @MainActor
@@ -162,7 +162,7 @@ final class DismissCommandTests: XCTestCase {
         if notification { await model.dismissNotification(sessionID: "session", notificationID: "N1") }
         else { await model.dismissRequest(sessionID: "session", requestID: "A") }
         XCTAssertNotNil(model.errorMessage)
-        XCTAssertEqual(model.connectionState, .failed)
+        XCTAssertEqual(model.connectionState, .preparing)
         XCTAssertEqual(model.sessions.first?.request?.id, "A")
         XCTAssertEqual(model.sessions.first?.notifications.map(\.id), ["N1", "N2"])
         XCTAssertTrue(storage.saved.isEmpty)
