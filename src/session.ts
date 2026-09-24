@@ -131,7 +131,7 @@ export class Session extends DurableObject<SessionEnv> {
   private readonly state: DurableObjectState;
   private readonly apns: APNsClient;
   private readonly groups: DurableObjectNamespace<DeviceGroup>;
-  private readonly devices: DurableObjectStub<DeviceRegistry>;
+  private readonly devices: DurableObjectNamespace<DeviceRegistry>;
   private readonly attachments: R2Bucket;
 
   constructor(
@@ -141,7 +141,7 @@ export class Session extends DurableObject<SessionEnv> {
     super(state, env);
     this.state = state;
     this.groups = env.GROUPS;
-    this.devices = env.DEVICES.get(env.DEVICES.idFromName("registry"));
+    this.devices = env.DEVICES;
     this.attachments = env.ATTACHMENTS;
     this.apns = new APNsClient({
       keyId: env.APNS_KEY_ID,
@@ -501,7 +501,7 @@ export class Session extends DurableObject<SessionEnv> {
           throw new HttpError(409, "item_kind_changed", "Session item notification kind changed between groups");
         }
         if (item.invalidated_at === null) {
-          await this.devices.activateSessionItem(
+          await this.deviceRegistry().activateSessionItem(
             meta.session_id,
             groupId,
             itemId,
@@ -559,7 +559,7 @@ export class Session extends DurableObject<SessionEnv> {
       this.state.storage.sql.exec("UPDATE meta SET expires_at = ? WHERE singleton = 1", expiresAt);
     });
     if (activeItem && itemId !== null) {
-      await this.devices.activateSessionItem(meta.session_id, groupId, itemId, recipients);
+      await this.deviceRegistry().activateSessionItem(meta.session_id, groupId, itemId, recipients);
     }
     await this.scheduleNextAlarm(expiresAt);
     return json({ expiresAt }, 201);
@@ -817,7 +817,7 @@ export class Session extends DurableObject<SessionEnv> {
       }
     }
     if (itemId !== null) this.requireDeliveredItem(itemId, groupId, deviceId);
-    if (itemId !== null) await this.devices.deactivateSessionItem(meta.session_id, itemId);
+    if (itemId !== null) await this.deviceRegistry().deactivateSessionItem(meta.session_id, itemId);
     const now = Date.now();
     this.state.storage.transactionSync(() => {
       this.state.storage.sql.exec(
@@ -1112,12 +1112,19 @@ export class Session extends DurableObject<SessionEnv> {
     return this.groups.get(this.groups.idFromName(groupId));
   }
 
+  // A stub is bound to one registry instance and keeps failing with "Connection
+  // closed" once that instance is gone, so callers take a fresh stub every time
+  // instead of reusing one cached at construction.
+  private deviceRegistry(): DurableObjectStub<DeviceRegistry> {
+    return this.devices.get(this.devices.idFromName("registry"));
+  }
+
   private async pushTargets(deviceIds: string[]): Promise<DevicePushTarget[]> {
-    return this.devices.getPushTargets(deviceIds);
+    return this.deviceRegistry().getPushTargets(deviceIds);
   }
 
   private async clearPush(target: DevicePushTarget): Promise<void> {
-    await this.devices.clearPushToken(target.deviceId, target.token);
+    await this.deviceRegistry().clearPushToken(target.deviceId, target.token);
   }
 
   private attentiveDevices(): Set<string> {
@@ -1207,7 +1214,7 @@ export class Session extends DurableObject<SessionEnv> {
   }
 
   private async expireSession(sessionId: string): Promise<void> {
-    await this.devices.deactivateSession(sessionId);
+    await this.deviceRegistry().deactivateSession(sessionId);
     const objectKeys = Array.from(this.state.storage.sql.exec<{ object_key: string }>(
       "SELECT object_key FROM session_attachments_v4",
     )).map((row) => row.object_key);
