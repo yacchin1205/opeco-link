@@ -170,36 +170,9 @@ The image URL is reachable only from the same machine as the `opeco` process. Wh
 
 See [CONCEPT.md](CONCEPT.md) for the product model and [DESIGN.md](DESIGN.md) for design rationale.
 
-## Web tests
+## Support
 
-```sh
-npm ci
-npx playwright install --with-deps chromium
-npm run check
-npm run test:e2e
-```
-
-The browser suite requires Go and runs Chromium against a local Wrangler Worker on
-`127.0.0.1:8790`. It builds the real CLI and uses its MCP interface for session
-creation, events, and responses; it does not mock the relay or seed browser storage.
-Each test starts with isolated browser storage. The phone, portrait-tablet, and
-landscape-tablet projects check empty state, device management, joining sessions,
-notification dismissal, answers, feedback, device addition/removal, and card layout.
-These are Chromium viewport tests, not physical iPhone or Safari tests.
-
-The `web` job runs both suites on pull requests. Stage screenshots and the HTML
-report are retained as the `web-e2e-results` artifact; failures also retain browser
-traces. Locally, use `npx playwright show-report` to inspect the same report.
-`scripts/test-all.sh` includes the browser suite as well.
-
-## Releases
-
-GoReleaser builds archives for Linux, macOS, and Windows on amd64 and arm64. Pushing a semantic version tag creates a GitHub Release with those archives and `checksums.txt`:
-
-```sh
-git tag v2026.8.0
-git push origin v2026.8.0
-```
+Questions and problems: open an issue at https://github.com/yacchin1205/opeco-link/issues, or email opeco-link-support@googlegroups.com. Do not include private keys or unused pairing links or QR codes. The privacy policy is at https://docs.opeco.link/privacy.
 
 ## License
 
