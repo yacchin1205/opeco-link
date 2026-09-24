@@ -123,11 +123,7 @@ test("device addition inherits sessions and removal clears the badge", async ({ 
     await screenshot(page, "two-devices");
     await screenshot(second, "inherited-session");
     const remove = page.getByRole("button", { name: /^デバイス .* をグループから除外$/ });
-    await remove.focus();
-    await page.waitForResponse((response) => response.url().includes("/state?") && response.ok());
-    // Group edits are rejected during synchronization, even while the button is enabled.
-    await page.waitForLoadState("networkidle");
-    await expect(remove).toBeFocused();
+    // A press during the periodic synchronization waits for it instead of being rejected.
     const dialogPromise = page.waitForEvent("dialog");
     const click = remove.click();
     const dialog = await dialogPromise;
