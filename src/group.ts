@@ -146,7 +146,7 @@ export type SessionDeviceAuthorization = GroupAuthorization | "unavailable";
 
 export class DeviceGroup extends DurableObject<GroupEnv> {
   private readonly state: DurableObjectState;
-  private readonly devices: DurableObjectStub<DeviceRegistry>;
+  private readonly devices: DurableObjectNamespace<DeviceRegistry>;
   private readonly sessions: DurableObjectNamespace<Session>;
 
   constructor(
@@ -155,7 +155,7 @@ export class DeviceGroup extends DurableObject<GroupEnv> {
   ) {
     super(state, env);
     this.state = state;
-    this.devices = env.DEVICES.get(env.DEVICES.idFromName("registry"));
+    this.devices = env.DEVICES;
     this.sessions = env.SESSIONS;
     this.createSchema();
   }
@@ -674,7 +674,7 @@ export class DeviceGroup extends DurableObject<GroupEnv> {
           ["opeco.link/group-abandon/v1", meta.group_id, actor.device_id, headTransitionHash].join("\n"),
         );
         this.state.storage.sql.exec("DELETE FROM group_members_v3 WHERE device_id = ?", deviceId);
-        await this.devices.deactivateGroupDevice(meta.group_id, deviceId);
+        await this.deviceRegistry().deactivateGroupDevice(meta.group_id, deviceId);
         return json({ removed: true, transitionHash: headTransitionHash });
       }
       expectKeys(body, ["transition", "packages"]);
@@ -706,7 +706,7 @@ export class DeviceGroup extends DurableObject<GroupEnv> {
         this.state.storage.sql.exec("DELETE FROM group_members_v3 WHERE device_id = ?", deviceId);
         this.insertTransition(transition, packages);
       });
-      await this.devices.deactivateGroupDevice(meta.group_id, deviceId);
+      await this.deviceRegistry().deactivateGroupDevice(meta.group_id, deviceId);
       return json({ removed: true, transitionHash: transition.transitionHash });
     }
     expectKeys(body, ["actorSignature"]);
@@ -719,7 +719,7 @@ export class DeviceGroup extends DurableObject<GroupEnv> {
       throw new HttpError(404, "device_not_found", "Active device not found");
     }
     this.state.storage.sql.exec("DELETE FROM group_members_v3 WHERE device_id = ?", deviceId);
-    await this.devices.deactivateGroupDevice(meta.group_id, deviceId);
+    await this.deviceRegistry().deactivateGroupDevice(meta.group_id, deviceId);
     return json({ removed: true });
   }
 
@@ -833,6 +833,12 @@ export class DeviceGroup extends DurableObject<GroupEnv> {
 
   private sessionStub(sessionId: string): DurableObjectStub<Session> {
     return this.sessions.get(this.sessions.idFromName(sessionId));
+  }
+
+  // Same as Session.deviceRegistry: a cached stub outlives the registry instance
+  // it was bound to and then fails every call with "Connection closed".
+  private deviceRegistry(): DurableObjectStub<DeviceRegistry> {
+    return this.devices.get(this.devices.idFromName("registry"));
   }
 
   private async requireMember(request: Request): Promise<MemberRow> {
@@ -959,7 +965,7 @@ export class DeviceGroup extends DurableObject<GroupEnv> {
   }
 
   private async registeredDevice(deviceId: string): Promise<{ signingPublicKey: string }> {
-    const result = await this.devices.getRegisteredDevice(deviceId);
+    const result = await this.deviceRegistry().getRegisteredDevice(deviceId);
     if (result === null) throw new HttpError(404, "device_not_found", "Device not found");
     if (result.deviceId !== deviceId) throw new Error("Device registry returned another device");
     return { signingPublicKey: result.signingPublicKey };
