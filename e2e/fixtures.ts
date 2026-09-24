@@ -20,7 +20,7 @@ export const test = base.extend<{
         clients.push(client);
         await client.connect(new StdioClientTransport({
           command: resolve(".wrangler/e2e/opeco"),
-          args: ["--base-url", baseURL!, "mcp"],
+          args: ["--base-url", baseURL!, "--no-browser", "mcp"],
           stderr: "inherit",
         }));
         const call = async (name: string, args: Record<string, unknown>) => {

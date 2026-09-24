@@ -77,7 +77,9 @@ Start a session:
 opeco --interactive --title "Deployment"
 ```
 
-The CLI prints a terminal QR code, its pairing URL, and a `QR image` URL such as `http://127.0.0.1:49152/qr/...`. Open the local URL in a browser to display a full-size QR image without creating a file, then scan it with the receiving device. The CLI reports when a new device group starts receiving the session.
+The CLI prints a terminal QR code, its pairing URL, and a `QR image` URL such as `http://127.0.0.1:49152/qr/...`, then opens that URL in the default browser to display a full-size QR image without creating a file. Scan it with the receiving device. The CLI reports whether the browser opened, and reports when a new device group starts receiving the session.
+
+The browser is not opened inside an SSH session, where it would appear on the remote display, and `--no-browser` suppresses it everywhere. The QR image URL is printed either way, so it can be opened by hand.
 
 The terminal QR code depends on the cell geometry of a terminal, so it is drawn only when `opeco` writes to one; redirected or piped output gets the two URLs alone. Pass `--no-terminal-qr` to suppress it on a terminal as well, when the block characters are noise, when the terminal is too narrow to render them, or when the screen is being shared or recorded. The pairing URL is still printed either way and remains a temporary secret.
 
@@ -104,7 +106,7 @@ quit
 - `color` changes the card color during the session; use `color random` to select another pastel color.
 - `status` updates the card silently, unless the device is watching the session: long-press the opeco icon beside the session on iOS or macOS to toggle watching, and every status update then shows a generic status-updated alert, collapsed to the latest one. `notify` returns the item ID used to identify a later dismissal and shows a generic new-notification alert, while `request` shows a generic input-requested alert. Encrypted event content is not included in any OS alert. The PWA has no OS push notifications or session watching.
 - `close-request` ends the identified request on connected devices.
-- Each local QR image remains available for 10 minutes or until `opeco` exits. It is held only in process memory, and the response prevents browser caching.
+- Each local QR image remains available for 10 minutes or until `opeco` exits. It is held only in process memory, and the response prevents browser caching. `pair` opens the new image in the browser under the same rules as startup.
 - `responses` retrieves every choice response, request dismissal, and free-form message without selecting or aggregating them.
 - `close` immediately deletes the session and removes its card from connected browsers.
 - `quit` only exits the CLI. The session remains until its normal expiry, but its creator keys are lost with the process.
@@ -148,14 +150,16 @@ Photos use a separate ECDH/HKDF context and full-file AES-256-GCM encryption. A 
 
 Verified plaintext is written below the operating system's temporary directory, with a `0700` directory and `0600` file where those modes apply. It is removed when the local session is closed or replaced. This is ordinary temporary-file cleanup, not secure erasure: a crash can leave the file until the operating system cleans its temporary storage.
 
-`session_create` and `session_pairing_create` return `qr_image_url` and `pairing_url`. They do not return a terminal QR code: an MCP result is rendered by an agent before a person sees it, and neither `opeco` nor the agent can check that block characters survived that rendering intact. Ask the person to open `qr_image_url` in a browser.
+`session_create` and `session_pairing_create` return `qr_image_url` and `pairing_url`. They do not return a terminal QR code: an MCP result is rendered by an agent before a person sees it, and neither `opeco` nor the agent can check that block characters survived that rendering intact.
+
+`opeco` opens `qr_image_url` in the default browser of its own machine and reports the outcome: `qr_opened` is true when the browser command succeeded, and `qr_open_error` otherwise explains why nothing opened, such as an SSH session, a missing `open` or `xdg-open`, or `--no-browser` in the MCP `args`. When nothing opened, ask the person to open `qr_image_url` in a browser.
 
 The image URL is reachable only from the same machine as the `opeco` process. When MCP runs in a container, on a remote host, or across SSH without port forwarding, use the pairing URL instead.
 
 ## Security notes
 
 - Treat an unused pairing QR code or URL as a temporary secret.
-- Local QR images use an opaque, independently generated loopback URL. The URL contains no pairing data and expires after 10 minutes, but anyone who can view the image can use the underlying one-shot pairing secret.
+- Local QR images use an opaque, independently generated loopback URL. The URL contains no pairing data and expires after 10 minutes, but anyone who can view the image can use the underlying one-shot pairing secret. Interactive and MCP modes open the image in the default browser of the machine running `opeco`, so on a shared or remotely viewed display start `opeco` with `--no-browser`.
 - Interactive and MCP session management keys exist only in process memory. Shell sessions keep keys and authentication state in an OS temporary directory (`0700`) and file (`0600`) where those modes apply. Treat that file as a secret: anyone who can read it can control the session and decrypt its messages. Do not share, back up, or commit it. Cleanup is not secure erasure, and missing keys are not recoverable.
 - The relay can observe metadata such as timestamps, identifiers, and ciphertext sizes.
 - Attachment objects in R2 are ciphertext only. They are removed after `opeco` has advanced past the response and polls again, or when the session expires; an uploaded attachment that is never committed can remain until session expiry.

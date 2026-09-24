@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"opeco.link/internal/browser"
 	"opeco.link/internal/mcpserver"
 	"opeco.link/internal/notify"
 )
@@ -32,6 +33,7 @@ func run() (runErr error) {
 	color := flags.String("color", "random", "session panel color: random or #rrggbb")
 	interactiveMode := flags.Bool("interactive", false, "run the long-lived interactive CLI instead of exporting a shell session")
 	noTerminalQR := flags.Bool("no-terminal-qr", false, "print the pairing URL without drawing a terminal QR code")
+	noBrowser := flags.Bool("no-browser", false, "do not open the QR image in the default browser (interactive and mcp modes)")
 	flags.Usage = func() {
 		fmt.Fprintln(flags.Output(), "Usage: eval \"$(opeco [--title TITLE] [--color COLOR])\"\n       opeco COMMAND [ARGS...]\n       opeco --interactive [--title TITLE]\n       opeco mcp\n\nCommands: join, pair, notify TEXT, status TEXT, color COLOR, request PROMPT OPTION OPTION..., close-request ID, responses, close")
 		flags.PrintDefaults()
@@ -78,12 +80,16 @@ func run() (runErr error) {
 		runErr = errors.Join(runErr, viewer.Close())
 	}()
 
+	opener := browser.Open
+	if *noBrowser {
+		opener = func(context.Context, string) error { return errors.New("disabled by --no-browser") }
+	}
 	operation := func(ctx context.Context) error {
 		if flags.NArg() == 1 {
-			return mcpserver.New(store, viewer).Run(ctx)
+			return mcpserver.New(store, viewer, opener).Run(ctx)
 		}
 		terminalQR := !*noTerminalQR && isCharacterDevice(os.Stdout)
-		return interactive(ctx, store, viewer, *title, *color, terminalQR, os.Stdin, os.Stdout, os.Stderr)
+		return interactive(ctx, store, viewer, opener, *title, *color, terminalQR, os.Stdin, os.Stdout, os.Stderr)
 	}
 	err = supervise(ctx, viewer, operation)
 	if errors.Is(err, context.Canceled) {
@@ -123,7 +129,7 @@ func supervise(ctx context.Context, viewer *notify.QRViewer, operation func(cont
 	}
 }
 
-func interactive(ctx context.Context, store *notify.Store, viewer *notify.QRViewer, title, color string, terminalQR bool, input io.Reader, output, errorOutput io.Writer) error {
+func interactive(ctx context.Context, store *notify.Store, viewer *notify.QRViewer, opener browser.Opener, title, color string, terminalQR bool, input io.Reader, output, errorOutput io.Writer) error {
 	sessionID, pairingURL, err := store.Create(ctx, title, color)
 	if err != nil {
 		return err
@@ -133,7 +139,7 @@ func interactive(ctx context.Context, store *notify.Store, viewer *notify.QRView
 		return err
 	}
 	fmt.Fprintf(output, "Session: %s\n", sessionID)
-	if err := writePairing(output, pairingURL, imageURL, terminalQR); err != nil {
+	if err := writePairing(ctx, output, opener, pairingURL, imageURL, terminalQR); err != nil {
 		return err
 	}
 	fmt.Fprintln(output, "Commands: join, pair, notify TEXT, status TEXT, color #rrggbb|random, request PROMPT | OPTION | OPTION, close-request REQUEST_ID, responses, close, quit")
@@ -184,7 +190,7 @@ func interactive(ctx context.Context, store *notify.Store, viewer *notify.QRView
 				continue
 			}
 			command, argument, _ := strings.Cut(line, " ")
-			exit, err := runCommand(ctx, store, viewer, sessionID, command, argument, &knownGroups, terminalQR, output)
+			exit, err := runCommand(ctx, store, viewer, opener, sessionID, command, argument, &knownGroups, terminalQR, output)
 			if err != nil {
 				return err
 			}
@@ -196,15 +202,22 @@ func interactive(ctx context.Context, store *notify.Store, viewer *notify.QRView
 	}
 }
 
-func writePairing(output io.Writer, pairingURL, imageURL string, terminalQR bool) error {
+func writePairing(ctx context.Context, output io.Writer, opener browser.Opener, pairingURL, imageURL string, terminalQR bool) error {
 	if err := writeTerminalPairing(output, pairingURL, terminalQR); err != nil {
 		return err
 	}
-	_, err := fmt.Fprintf(output, "QR image: %s\n", imageURL)
+	if _, err := fmt.Fprintf(output, "QR image: %s\n", imageURL); err != nil {
+		return err
+	}
+	if err := opener(ctx, imageURL); err != nil {
+		_, err = fmt.Fprintf(output, "QR image not opened in a browser (%v); open the URL above yourself\n", err)
+		return err
+	}
+	_, err := fmt.Fprintln(output, "QR image opened in the default browser")
 	return err
 }
 
-func runCommand(ctx context.Context, store *notify.Store, viewer *notify.QRViewer, sessionID, command, argument string, knownGroups *int, terminalQR bool, output io.Writer) (bool, error) {
+func runCommand(ctx context.Context, store *notify.Store, viewer *notify.QRViewer, opener browser.Opener, sessionID, command, argument string, knownGroups *int, terminalQR bool, output io.Writer) (bool, error) {
 	if command == "quit" {
 		return true, nil
 	}
@@ -237,7 +250,7 @@ func runCommand(ctx context.Context, store *notify.Store, viewer *notify.QRViewe
 		if err != nil {
 			return false, err
 		}
-		return false, writePairing(output, url, imageURL, terminalQR)
+		return false, writePairing(ctx, output, opener, url, imageURL, terminalQR)
 	default:
 		return command == "close", executeCommand(ctx, store, sessionID, args, output)
 	}
