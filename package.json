@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "build:web": "node scripts/build-web.mjs",
+    "build:docs": "node scripts/build-docs.mjs",
     "check": "npm run typecheck && npm test",
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
@@ -26,6 +27,7 @@
     "@playwright/test": "^1.63.0",
     "@types/node": "^26.6.2",
     "esbuild": "^0.28.1",
+    "marked": "^18.0.14",
     "typescript": "^7.0.2",
     "vitest": "^4.1.11",
     "wrangler": "^4.129.1"
