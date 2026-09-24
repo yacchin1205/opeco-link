@@ -43,15 +43,19 @@ closed; do not close it defensively.
 
 `session_create` and `session_pairing_create` provide:
 
-- `qr_image_url`: a loopback PNG held in memory. This is the default when the
-  browser and `opeco` run on the same machine.
+- `qr_image_url`: a loopback PNG held in memory. `opeco` opens it in the default
+  browser of its own machine and reports the outcome.
+- `qr_opened`: true when the browser command succeeded. Tell the person the QR
+  code is in their browser window and then wait.
+- `qr_open_error`: present when nothing opened, with the reason (an SSH session,
+  no `open` or `xdg-open`, or `--no-browser`). Then give the person
+  `qr_image_url` alone on its own line and ask them to open it in a browser.
 - `pairing_url`: the live one-shot secret. Use it only for containers, remote
   hosts, or SSH where loopback is not reachable.
 
-Never render or reconstruct the QR code yourself. Give the person
-`qr_image_url` alone on its own line and ask them to open it in a browser, or
-open it with the system browser and then wait. Do not say that the QR is visible
-or pairing is complete before the person has acted.
+Never render or reconstruct the QR code yourself, and do not open
+`qr_image_url` yourself when `qr_opened` is true. Do not say that pairing is
+complete before `session_wait_for_device` confirms it.
 
 Keep `pairing_url` out of shared logs, transcripts, issues, PRs, and commits.
 Anyone who gets an unused pairing secret can join. A pairing is consumed by the

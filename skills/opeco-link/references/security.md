@@ -45,7 +45,9 @@ security is being explained, reviewed, or flagged.
   status changed. APNs is only a wake-up path; payload retrieval uses the
   session channel.
 - The QR image is loopback-only, memory-backed, `no-store`, and expires after
-  ten minutes. Its URL is random and independent of the pairing data.
+  ten minutes. Its URL is random and independent of the pairing data. `opeco`
+  opens it in the browser of its own machine, never inside an SSH session, and
+  `--no-browser` disables that.
 - Sessions expire roughly one day after the creator's last activity. There are
   no accounts, recovery, enumeration, or search.
 

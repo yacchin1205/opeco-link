@@ -7,18 +7,20 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"opeco.link/internal/browser"
 	"opeco.link/internal/notify"
 )
 
-const instructions = "Call session_create for the work the user wants to follow; it returns the session this process is already running when there is one, so an agent never manages more than one session and never asks for a second QR code. Add a device with session_pairing_create, and start a separate session only by closing the running one first, at the user's request. Ask the user to open the returned local QR image URL in a browser when the browser runs on the same machine as opeco; otherwise give them the pairing URL. Do not claim a device is paired until session_wait_for_device confirms it, and do not send events before that. Send status and notifications as work changes. Every send result may carry responses from devices, including messages the user wrote without being asked; read that field every time, because responses are handed over once and nothing else will surface them. A request may have multiple choices. Forward every response to the agent; opeco does not select or aggregate responses. Close a session only when immediate removal is intended; normal process exit leaves it to expire."
+const instructions = "Call session_create for the work the user wants to follow; it returns the session this process is already running when there is one, so an agent never manages more than one session and never asks for a second QR code. Add a device with session_pairing_create, and start a separate session only by closing the running one first, at the user's request. opeco opens the QR image in the browser on its own machine when it can: qr_opened true means the person can scan the browser window now, while qr_open_error explains why nothing opened, in which case give them the local QR image URL, or the pairing URL when their browser is on another machine. Do not claim a device is paired until session_wait_for_device confirms it, and do not send events before that. Send status and notifications as work changes. Every send result may carry responses from devices, including messages the user wrote without being asked; read that field every time, because responses are handed over once and nothing else will surface them. A request may have multiple choices. Forward every response to the agent; opeco does not select or aggregate responses. Close a session only when immediate removal is intended; normal process exit leaves it to expire."
 
 type Server struct {
 	store  *notify.Store
 	viewer *notify.QRViewer
+	opener browser.Opener
 }
 
-func New(store *notify.Store, viewer *notify.QRViewer) *Server {
-	return &Server{store: store, viewer: viewer}
+func New(store *notify.Store, viewer *notify.QRViewer, opener browser.Opener) *Server {
+	return &Server{store: store, viewer: viewer, opener: opener}
 }
 
 func (s *Server) Run(ctx context.Context) error {
@@ -85,6 +87,8 @@ type sessionOutput struct {
 	DeviceGroupCount int    `json:"device_group_count"`
 	PairingURL       string `json:"pairing_url,omitempty"`
 	QRImageURL       string `json:"qr_image_url,omitempty"`
+	QROpened         bool   `json:"qr_opened,omitempty"`
+	QROpenError      string `json:"qr_open_error,omitempty"`
 }
 
 type createInput struct {
@@ -96,11 +100,14 @@ type createInput struct {
 // through an agent's rendering before a person sees it, and neither opeco nor
 // the agent can inspect the result, so a block-character QR cannot be trusted to
 // stay scannable. Callers show the loopback image, or the pairing URL when the
-// browser is not on this machine.
+// browser is not on this machine. opeco opens the image itself when it can and
+// reports the outcome, because it is the only party that can observe it.
 type pairingOutput struct {
-	SessionID  string `json:"session_id"`
-	PairingURL string `json:"pairing_url"`
-	QRImageURL string `json:"qr_image_url"`
+	SessionID   string `json:"session_id"`
+	PairingURL  string `json:"pairing_url"`
+	QRImageURL  string `json:"qr_image_url"`
+	QROpened    bool   `json:"qr_opened,omitempty"`
+	QROpenError string `json:"qr_open_error,omitempty"`
 }
 
 func (s *Server) create(ctx context.Context, _ *mcp.CallToolRequest, input createInput) (*mcp.CallToolResult, sessionOutput, error) {
@@ -121,8 +128,16 @@ func (s *Server) create(ctx context.Context, _ *mcp.CallToolRequest, input creat
 			return nil, sessionOutput{}, err
 		}
 		output.QRImageURL = imageURL
+		output.QROpened, output.QROpenError = s.openQR(ctx, imageURL)
 	}
 	return nil, output, nil
+}
+
+func (s *Server) openQR(ctx context.Context, imageURL string) (bool, string) {
+	if err := s.opener(ctx, imageURL); err != nil {
+		return false, err.Error()
+	}
+	return true, ""
 }
 
 type sessionInput struct {
@@ -138,7 +153,9 @@ func (s *Server) addPairing(ctx context.Context, _ *mcp.CallToolRequest, input s
 	if err != nil {
 		return nil, pairingOutput{}, err
 	}
-	return nil, pairingOutput{SessionID: input.SessionID, PairingURL: pairingURL, QRImageURL: imageURL}, nil
+	output := pairingOutput{SessionID: input.SessionID, PairingURL: pairingURL, QRImageURL: imageURL}
+	output.QROpened, output.QROpenError = s.openQR(ctx, imageURL)
+	return nil, output, nil
 }
 
 type waitInput struct {

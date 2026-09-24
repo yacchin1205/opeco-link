@@ -38,7 +38,7 @@ func TestMCPEncryptedRoundTrip(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	t.Cleanup(cancel)
-	command := exec.CommandContext(ctx, "go", "run", "../../cmd/opeco", "--base-url", baseURL, "mcp")
+	command := exec.CommandContext(ctx, "go", "run", "../../cmd/opeco", "--base-url", baseURL, "--no-browser", "mcp")
 	command.Stderr = os.Stderr
 	client := mcp.NewClient(&mcp.Implementation{Name: "opeco-link-integration-test", Version: "0.1.0"}, nil)
 	clientSession, err := client.Connect(ctx, &mcp.CommandTransport{Command: command}, nil)
@@ -59,6 +59,7 @@ func TestMCPEncryptedRoundTrip(t *testing.T) {
 	}
 	assertNoTerminalQRCode(t, created.TerminalQRCode)
 	assertQRImage(t, created.QRImageURL)
+	assertQRNotOpened(t, created.QROpened, created.QROpenError)
 	joined := joinFromPairingURL(t, ctx, api, created.PairingURL)
 
 	waited := callTool[waitDeviceToolOutput](t, ctx, clientSession, "session_wait_for_device", map[string]any{
@@ -91,6 +92,7 @@ func TestMCPEncryptedRoundTrip(t *testing.T) {
 	}
 	assertNoTerminalQRCode(t, additionalPairing.TerminalQRCode)
 	assertQRImage(t, additionalPairing.QRImageURL)
+	assertQRNotOpened(t, additionalPairing.QROpened, additionalPairing.QROpenError)
 	secondGroup := joinFromPairingURL(t, ctx, api, additionalPairing.PairingURL)
 	waited = callTool[waitDeviceToolOutput](t, ctx, clientSession, "session_wait_for_device", map[string]any{
 		"session_id": created.SessionID, "timeout_seconds": 5,
@@ -239,6 +241,15 @@ func assertNoTerminalQRCode(t *testing.T, terminalQRCode string) {
 	t.Helper()
 	if terminalQRCode != "" {
 		t.Fatal("MCP pairing result carried a terminal QR code; only the loopback image URL and the pairing URL belong on the MCP surface")
+	}
+}
+
+// The test runs opeco with --no-browser, so the result must say the QR image
+// stayed unopened and why, instead of leaving the agent to guess.
+func assertQRNotOpened(t *testing.T, opened bool, openError string) {
+	t.Helper()
+	if opened || openError != "disabled by --no-browser" {
+		t.Fatalf("qr_opened = %v, qr_open_error = %q, want the --no-browser refusal", opened, openError)
 	}
 }
 
@@ -468,6 +479,8 @@ type sessionToolOutput struct {
 	TerminalQRCode   string `json:"qr_code"`
 	PairingURL       string `json:"pairing_url"`
 	QRImageURL       string `json:"qr_image_url"`
+	QROpened         bool   `json:"qr_opened"`
+	QROpenError      string `json:"qr_open_error"`
 }
 
 type pairingToolOutput struct {
@@ -478,6 +491,8 @@ type pairingToolOutput struct {
 	TerminalQRCode string `json:"qr_code"`
 	PairingURL     string `json:"pairing_url"`
 	QRImageURL     string `json:"qr_image_url"`
+	QROpened       bool   `json:"qr_opened"`
+	QROpenError    string `json:"qr_open_error"`
 }
 
 type waitDeviceToolOutput struct {
