@@ -8,6 +8,8 @@ There are no user accounts and no recovery flow. A session expires one day after
 
 The PWA is available at [opeco.link](https://opeco.link).
 
+A demo that plays the agent's part runs at [demo.opeco.link](https://demo.opeco.link): open it, scan the QR code with the app, and send notifications, questions, and status updates from the page.
+
 ![Architecture: the opeco CLI connects an agent workspace to your devices through opeco.link with end-to-end encrypted communication.](brand/architecture.svg)
 
 ## Install

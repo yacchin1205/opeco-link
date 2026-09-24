@@ -97,6 +97,27 @@ describe("session relay", () => {
     expect(secure.headers.get("strict-transport-security")).toBe("max-age=15552000");
   });
 
+  it("answers CORS only for the demo origin on API paths", async () => {
+    const preflight = await SELF.fetch("https://opeco.link/api/sessions", {
+      method: "OPTIONS",
+      headers: { origin: "https://demo.opeco.link", "access-control-request-method": "POST" },
+    });
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get("access-control-allow-origin")).toBe("https://demo.opeco.link");
+    expect(preflight.headers.get("access-control-allow-headers")).toBe("authorization, content-type");
+
+    const allowed = await SELF.fetch("https://opeco.link/api/health", { headers: { origin: "https://demo.opeco.link" } });
+    expect(allowed.status).toBe(200);
+    expect(allowed.headers.get("access-control-allow-origin")).toBe("https://demo.opeco.link");
+    expect(allowed.headers.get("vary")).toBe("origin");
+
+    const other = await SELF.fetch("https://opeco.link/api/health", { headers: { origin: "https://example.com" } });
+    expect(other.headers.get("access-control-allow-origin")).toBeNull();
+
+    const asset = await SELF.fetch("https://opeco.link/robots.txt", { headers: { origin: "https://demo.opeco.link" } });
+    expect(asset.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
   it("associates only QR link paths with the iOS app", async () => {
     const response = await SELF.fetch("https://opeco.link/.well-known/apple-app-site-association");
     expect(response.status).toBe(200);
