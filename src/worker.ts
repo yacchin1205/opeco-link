@@ -15,7 +15,38 @@ interface Env {
 
 export { DeviceGroup, DeviceRegistry, DeviceRequest, Session };
 
+// The demo page at this origin drives the API from a browser as a session
+// creator, so it needs CORS; every other client is same-origin or non-browser.
+const CORS_ORIGINS = new Set(["https://demo.opeco.link"]);
+
 export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const origin = request.headers.get("origin");
+    const url = new URL(request.url);
+    if (origin === null || !CORS_ORIGINS.has(origin) || !url.pathname.startsWith("/api/")) {
+      return relay.fetch(request, env);
+    }
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "access-control-allow-origin": origin,
+          "access-control-allow-methods": "GET, POST, PUT, DELETE",
+          "access-control-allow-headers": "authorization, content-type",
+          "access-control-max-age": "86400",
+          vary: "origin",
+        },
+      });
+    }
+    const response = await relay.fetch(request, env);
+    const headers = new Headers(response.headers);
+    headers.set("access-control-allow-origin", origin);
+    headers.append("vary", "origin");
+    return new Response(response.body, { status: response.status, headers });
+  },
+};
+
+const relay = {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       const url = new URL(request.url);
