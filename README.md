@@ -12,7 +12,19 @@ The PWA is available at [opeco.link](https://opeco.link).
 
 ## Install
 
-Build the `opeco` CLI from source:
+Download the archive for your platform from [GitHub Releases](https://github.com/yacchin1205/opeco-link/releases). Each release provides `opeco_<version>_<os>_<arch>.tar.gz` for Linux and macOS, `opeco_<version>_windows_<arch>.zip` for Windows, on amd64 and arm64, along with `checksums.txt`.
+
+Verify the checksum, extract the archive, and place the `opeco` executable (`opeco.exe` on Windows) on your `PATH`:
+
+```sh
+shasum -a 256 --ignore-missing -c checksums.txt
+tar -xzf opeco_<version>_<os>_<arch>.tar.gz
+install -m 0755 opeco /usr/local/bin/opeco
+```
+
+### Install from source
+
+Building requires the Go toolchain version declared in `go.mod`:
 
 ```sh
 git clone https://github.com/yacchin1205/opeco-link.git
@@ -20,7 +32,7 @@ cd opeco-link
 go build -o opeco ./cmd/opeco
 ```
 
-Place the resulting `opeco` executable (`opeco.exe` on Windows) on your `PATH`.
+Place the resulting `opeco` executable on your `PATH` as above.
 
 ## Shell CLI
 
