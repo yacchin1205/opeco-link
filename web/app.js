@@ -84,7 +84,10 @@ class LegacyProtocolError extends Error {}
 let identity;
 let groupState;
 let managingDevices = false;
-let synchronizing = false;
+// synchronization holds the running syncAll promise so a state action can wait
+// for it instead of being rejected; stateActionInProgress keeps the periodic
+// sync away and rejects a second press while an action runs.
+let synchronization = null;
 let stateActionInProgress = false;
 let requestURL;
 let pendingDeviceRequest = null;
@@ -328,8 +331,16 @@ async function pollDeviceRequest() {
 }
 
 async function syncAll() {
-  if (synchronizing || stateActionInProgress) return;
-  synchronizing = true;
+  if (synchronization !== null || stateActionInProgress) return;
+  synchronization = synchronizeAll();
+  try {
+    await synchronization;
+  } finally {
+    synchronization = null;
+  }
+}
+
+async function synchronizeAll() {
   try {
     await deleteExpiredLocalSessions();
     await pollDeviceRequest();
@@ -362,8 +373,6 @@ async function syncAll() {
       return;
     }
     throw error;
-  } finally {
-    synchronizing = false;
   }
 }
 
@@ -697,9 +706,10 @@ async function sendFeedback(sessionId, message, imageFiles) {
 }
 
 async function withStateAction(action) {
-  if (synchronizing || stateActionInProgress) throw new Error("デバイス状態を同期しています。少し待ってから再試行してください");
+  if (stateActionInProgress) throw new Error("前の操作を処理しています。完了を待ってから再試行してください");
   stateActionInProgress = true;
   try {
+    if (synchronization !== null) await synchronization;
     return await action();
   } finally {
     stateActionInProgress = false;
