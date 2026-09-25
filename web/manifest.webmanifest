@@ -1,6 +1,6 @@
 {
-  "name": "opeco",
-  "short_name": "opeco",
+  "name": "opeco.link",
+  "short_name": "opeco.link",
   "description": "Agent sessions, briefly connected.",
   "start_url": "/",
   "display": "standalone",
