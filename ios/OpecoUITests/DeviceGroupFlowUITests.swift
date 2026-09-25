@@ -643,7 +643,7 @@ final class DeviceGroupFlowUITests: XCTestCase {
         XCTAssertTrue(share.waitForExistence(timeout: 10))
         share.tap()
         attachScreenshot(named: "62-photos-share-sheet", app: photos)
-        let service = photos.cells["opeco"]
+        let service = photos.cells["opeco.link"]
         let serviceReady = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "exists == true AND hittable == true"),
             object: service
@@ -680,7 +680,7 @@ final class DeviceGroupFlowUITests: XCTestCase {
             buttons.element(boundBy: 1).tap()
         }
         XCTAssertTrue(app.staticTexts["3 unresolved items"].waitForExistence(timeout: 5))
-        let icon = springboard.icons["opeco"].firstMatch
+        let icon = springboard.icons["opeco.link"].firstMatch
         showHomeScreen(icon: icon)
         let badgeThree = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value MATCHES %@", "3[^0-9].*"), object: icon)
         XCTAssertEqual(XCTWaiter().wait(for: [badgeThree], timeout: 10), .completed)
