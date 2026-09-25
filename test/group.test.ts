@@ -358,6 +358,7 @@ describe("devices and persistent groups", () => {
       const uploaded = await SELF.fetch(`https://opeco.link/api/sessions/${session.id}/attachments/${attachmentId}`, {
         method: "PUT",
         headers: {
+          "cf-connecting-ip": clientAddress(),
           authorization: `Bearer ${reserved.json.uploadToken}`,
           "content-type": "application/octet-stream",
         },
@@ -396,7 +397,7 @@ describe("devices and persistent groups", () => {
     for (const attachmentId of attachmentIds) {
       const downloaded = await SELF.fetch(
         `https://opeco.link/api/sessions/${session.id}/attachments/${attachmentId}`,
-        { headers: { authorization: `Bearer ${session.sessionToken}` } },
+        { headers: { "cf-connecting-ip": clientAddress(), authorization: `Bearer ${session.sessionToken}` } },
       );
       expect(downloaded.status).toBe(200);
       expect(new Uint8Array(await downloaded.arrayBuffer())).toEqual(ciphertext);
@@ -412,7 +413,7 @@ describe("devices and persistent groups", () => {
     for (const attachmentId of attachmentIds) {
       expect((await SELF.fetch(
         `https://opeco.link/api/sessions/${session.id}/attachments/${attachmentId}`,
-        { headers: { authorization: `Bearer ${session.sessionToken}` } },
+        { headers: { "cf-connecting-ip": clientAddress(), authorization: `Bearer ${session.sessionToken}` } },
       )).status).toBe(404);
     }
   });
@@ -1660,11 +1661,19 @@ async function sign(pair: CryptoKeyPair, transcript: string): Promise<string> {
   ));
 }
 
+// Each request gets its own client address: these tests exercise the protocol,
+// not the per-address rate limits, so no two calls may share a bucket.
+let addressCounter = 0;
+function clientAddress(): string {
+  addressCounter += 1;
+  return `198.51.${Math.floor(addressCounter / 250) % 250}.${addressCounter % 250}`;
+}
+
 async function api(
   path: string,
   options: { method?: string; token?: string; body?: unknown; headers?: Record<string, string> } = {},
 ) {
-  const headers = new Headers(options.headers);
+  const headers = new Headers({ "cf-connecting-ip": clientAddress(), ...options.headers });
   if (options.token !== undefined) headers.set("authorization", `Bearer ${options.token}`);
   if (options.body !== undefined) headers.set("content-type", "application/json");
   const response = await SELF.fetch(`https://opeco.link${path}`, {
