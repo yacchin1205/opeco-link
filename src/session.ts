@@ -38,6 +38,14 @@ const PUSH_ALARM_FALLBACK_MS = 15 * 60 * 1000;
 const NOTIFICATION_KIND = /^(none|status|notify|request)$/;
 const ATTACHMENT_MAX_CIPHERTEXT_BYTES = 2 * 1024 * 1024;
 const ATTACHMENT_UPLOAD_LIFETIME_MS = 10 * 60 * 1000;
+// Per-session caps. A session that reaches one is closed and replaced by its
+// creator; the relay never trims stored state on its own.
+const MAX_SESSION_EVENTS = 5_000;
+const MAX_SESSION_EVENT_BYTES = 64 * 1024 * 1024;
+const MAX_SESSION_PAIRINGS = 100;
+const MAX_SESSION_RESPONSES = 5_000;
+const MAX_SESSION_ATTACHMENTS = 100;
+const MAX_SESSION_ATTACHMENT_BYTES = 256 * 1024 * 1024;
 
 type ItemKind = "notify" | "request";
 
@@ -334,6 +342,9 @@ export class Session extends DurableObject<SessionEnv> {
 
   private async addPairing(request: Request): Promise<Response> {
     const pairing = pairingObject(await readObject(request));
+    if (this.aggregate("SELECT COUNT(*) AS count, 0 AS total FROM pairings").count >= MAX_SESSION_PAIRINGS) {
+      throw new HttpError(409, "session_limit", "Session has reached its pairing limit");
+    }
     this.state.storage.sql.exec(
       "INSERT INTO pairings (id, token_hash, created_at) VALUES (?, ?, ?)",
       pairing.id,
@@ -511,6 +522,12 @@ export class Session extends DurableObject<SessionEnv> {
       }
       await this.scheduleNextAlarm(meta.expires_at);
       return json({ expiresAt: meta.expires_at }, 201);
+    }
+    const stored = this.aggregate(
+      "SELECT COUNT(*) AS count, COALESCE(SUM(LENGTH(ciphertext)), 0) AS total FROM session_events_v3",
+    );
+    if (stored.count >= MAX_SESSION_EVENTS || stored.total + ciphertext.length > MAX_SESSION_EVENT_BYTES) {
+      throw new HttpError(409, "session_limit", "Session has reached its event limit; close it and create a new one");
     }
     const recipients = await this.groupKeyRecipients(group, keyTimestamp, meta.protocol_version);
     const now = Date.now();
@@ -698,6 +715,12 @@ export class Session extends DurableObject<SessionEnv> {
         ));
         if (count >= 5) throw new HttpError(413, "too_many_attachments", "A response may contain at most five images");
         if (this.responseExists(responseId)) throw new HttpError(409, "response_exists", "Response already exists");
+        const stored = this.aggregate(
+          "SELECT COUNT(*) AS count, COALESCE(SUM(ciphertext_length), 0) AS total FROM session_attachments_v4",
+        );
+        if (stored.count >= MAX_SESSION_ATTACHMENTS || stored.total + ciphertextLength > MAX_SESSION_ATTACHMENT_BYTES) {
+          throw new HttpError(409, "session_limit", "Session has reached its attachment limit");
+        }
         this.state.storage.sql.exec(
           `INSERT INTO session_attachments_v4
              (attachment_id, response_id, group_id, device_id, key_timestamp, object_key,
@@ -817,6 +840,9 @@ export class Session extends DurableObject<SessionEnv> {
       }
     }
     if (itemId !== null) this.requireDeliveredItem(itemId, groupId, deviceId);
+    if (this.aggregate("SELECT COUNT(*) AS count, 0 AS total FROM session_responses_v3").count >= MAX_SESSION_RESPONSES) {
+      throw new HttpError(409, "session_limit", "Session has reached its response limit");
+    }
     if (itemId !== null) await this.deviceRegistry().deactivateSessionItem(meta.session_id, itemId);
     const now = Date.now();
     this.state.storage.transactionSync(() => {
@@ -1401,6 +1427,12 @@ export class Session extends DurableObject<SessionEnv> {
       job.event_id,
       job.device_id,
     );
+  }
+
+  private aggregate(query: string): { count: number; total: number } {
+    const rows = Array.from(this.state.storage.sql.exec<{ count: number; total: number }>(query));
+    if (rows.length !== 1) throw new Error("Aggregate query must return exactly one row");
+    return rows[0];
   }
 
   private async scheduleNextAlarm(expiresAt: number): Promise<void> {

@@ -11,6 +11,11 @@ interface Env {
   DEVICE_REQUESTS: DurableObjectNamespace<DeviceRequest>;
   ASSETS: Fetcher;
   ATTACHMENTS: R2Bucket;
+  SESSION_CREATE_LIMIT: RateLimit;
+  PAIRING_LIMIT: RateLimit;
+  REGISTRATION_LIMIT: RateLimit;
+  EVENT_LIMIT: RateLimit;
+  RESPONSE_LIMIT: RateLimit;
 }
 
 export { DeviceGroup, DeviceRegistry, DeviceRequest, Session };
@@ -60,6 +65,11 @@ const relay = {
         url.protocol = "https:";
         return Response.redirect(url.toString(), 301);
       }
+      // Local development traffic (wrangler dev, the browser suite, the Go
+      // integration test) shares one loopback address and is not rate limited.
+      const throttle = async (limiter: RateLimit, key: string) => {
+        if (!localRequest) await limit(limiter, key);
+      };
       if (!url.pathname.startsWith("/api/")) {
         return env.ASSETS.fetch(request);
       }
@@ -67,6 +77,7 @@ const relay = {
         return json({ ok: true });
       }
       if (request.method === "POST" && url.pathname === "/api/devices") {
+        await throttle(env.REGISTRATION_LIMIT, clientAddress(request));
         return deviceRegistry(env).fetch(publicRequest(new URL("https://devices.internal/devices"), request));
       }
       const devicePushMatch = /^\/api\/devices\/([^/]+)\/push$/.exec(url.pathname);
@@ -78,6 +89,7 @@ const relay = {
         ));
       }
       if (request.method === "POST" && url.pathname === "/api/device-requests") {
+        await throttle(env.REGISTRATION_LIMIT, clientAddress(request));
         return deviceRegistry(env).fetch(publicRequest(
           new URL("https://devices.internal/device-requests"),
           request,
@@ -91,6 +103,7 @@ const relay = {
         return deviceRequestStub(env, requestId).fetch(publicRequest(internalUrl, request));
       }
       if (request.method === "POST" && url.pathname === "/api/sessions") {
+        await throttle(env.SESSION_CREATE_LIMIT, clientAddress(request));
         const body = await readObject(request);
         expectKeys(body, ["sessionId", "sessionTokenHash", "creatorPublicKey", "pairing"], ["protocolVersion"]);
         const sessionId = stringField(body, "sessionId", IDENTIFIER, 64);
@@ -100,6 +113,7 @@ const relay = {
       }
 
       if (request.method === "POST" && url.pathname === "/api/groups") {
+        await throttle(env.REGISTRATION_LIMIT, clientAddress(request));
         const body = await readObject(request);
         const groupId = stringField(body, "groupId", IDENTIFIER, 64);
         return groupStub(env, groupId).fetch(
@@ -112,6 +126,7 @@ const relay = {
         const groupId = stringField({ groupId: groupDeviceRequestMatch[1] }, "groupId", IDENTIFIER, 64);
         const requestId = stringField({ requestId: groupDeviceRequestMatch[2] }, "requestId", IDENTIFIER, 64);
         const suffix = groupDeviceRequestMatch[3] ?? "";
+        if (request.method === "POST" && suffix === "/approve") await throttle(env.REGISTRATION_LIMIT, clientAddress(request));
         const internalUrl = new URL(`https://device-request.internal/groups/${groupId}${suffix}`);
         internalUrl.search = url.search;
         return deviceRequestStub(env, requestId).fetch(publicRequest(internalUrl, request));
@@ -130,17 +145,39 @@ const relay = {
         throw new HttpError(404, "not_found", "Endpoint not found");
       }
       const sessionId = stringField({ sessionId: match[1] }, "sessionId", IDENTIFIER, 64);
+      const operation = match[2] ?? "/";
+      if (request.method === "POST" && operation === "/pairings") await throttle(env.PAIRING_LIMIT, clientAddress(request));
+      if (request.method === "POST" && operation === "/events") await throttle(env.EVENT_LIMIT, sessionId);
+      if ((request.method === "POST" && (operation === "/responses" || operation === "/attachments"))
+        || (request.method === "PUT" && operation.startsWith("/attachments/"))) {
+        await throttle(env.RESPONSE_LIMIT, sessionId);
+      }
       const internalUrl = new URL(`https://session.internal${match[2] ?? "/"}`);
       internalUrl.search = url.search;
       return sessionStub(env, sessionId).fetch(publicRequest(internalUrl, request));
     } catch (error) {
       if (error instanceof HttpError) {
-        return json({ error: error.code, message: error.message }, error.status);
+        const response = json({ error: error.code, message: error.message }, error.status);
+        if (error.status === 429) response.headers.set("retry-after", "60");
+        return response;
       }
       throw error;
     }
   },
 };
+
+// Cloudflare sets the client address on every request that reaches the Worker;
+// a request without it is not a client request and must not share a bucket.
+function clientAddress(request: Request): string {
+  const address = request.headers.get("cf-connecting-ip");
+  if (address === null) throw new Error("cf-connecting-ip header is missing");
+  return address;
+}
+
+async function limit(limiter: RateLimit, key: string): Promise<void> {
+  const { success } = await limiter.limit({ key });
+  if (!success) throw new HttpError(429, "rate_limited", "Too many requests for this operation; retry after a minute");
+}
 
 function sessionStub(env: Env, sessionId: string): DurableObjectStub<Session> {
   return env.SESSIONS.get(env.SESSIONS.idFromName(sessionId));

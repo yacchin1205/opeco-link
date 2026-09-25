@@ -36,7 +36,7 @@ describe("session relay", () => {
   it("rejects malformed JSON and unsafe cursors as protocol errors", async () => {
     const malformed = await SELF.fetch("https://opeco.link/api/sessions", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "cf-connecting-ip": "203.0.113.1" },
       body: "{",
     });
     expect(malformed.status).toBe(400);
@@ -97,10 +97,92 @@ describe("session relay", () => {
     expect(secure.headers.get("strict-transport-security")).toBe("max-age=15552000");
   });
 
+  it("limits session creation per client address and says when to retry", async () => {
+    const address = "198.51.100.7";
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const response = await SELF.fetch("https://opeco.link/api/sessions", {
+        method: "POST",
+        headers: { "content-type": "application/json", "cf-connecting-ip": address },
+        body: "{}",
+      });
+      expect(response.status).toBe(400);
+    }
+    const limited = await SELF.fetch("https://opeco.link/api/sessions", {
+      method: "POST",
+      headers: { "content-type": "application/json", "cf-connecting-ip": address },
+      body: "{}",
+    });
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("retry-after")).toBe("60");
+    expect((await limited.json<{ error: string }>()).error).toBe("rate_limited");
+
+    const other = await api("/api/sessions", { method: "POST", body: {}, address: "198.51.100.8" });
+    expect(other.status).toBe(400);
+  });
+
+  it("refuses requests that do not carry a client address", async () => {
+    await expect(SELF.fetch("https://opeco.link/api/sessions", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    })).rejects.toThrow();
+  });
+
+  it("caps pairings per session and reports the cap as permanent", async () => {
+    const session = await createSession();
+    for (let index = 1; index < 100; index += 1) {
+      const response = await api(`/api/sessions/${session.id}/pairings`, {
+        method: "POST",
+        token: session.sessionToken,
+        body: { id: randomId(), tokenHash: await hash(`pairing-${index}`) },
+        address: `198.51.100.${(index % 200) + 10}`,
+      });
+      expect(response.status).toBe(201);
+    }
+    const capped = await api(`/api/sessions/${session.id}/pairings`, {
+      method: "POST",
+      token: session.sessionToken,
+      body: { id: randomId(), tokenHash: await hash("pairing-last") },
+    });
+    expect(capped.status).toBe(409);
+    expect(capped.json.error).toBe("session_limit");
+  });
+
+  it("caps stored events per session before touching group keys", async () => {
+    const session = await createSession();
+    const groupId = randomId();
+    const stub = env.SESSIONS.get(env.SESSIONS.idFromName(session.id));
+    await runInDurableObject(stub, (_instance, state) => {
+      state.storage.sql.exec(
+        `INSERT INTO session_groups_v3 (id, pairing_id, initial_key_timestamp, initial_public_key, join_proof, joined_at)
+         VALUES (?, ?, 1, 'key', 'proof', 1)`,
+        groupId,
+        session.pairingId,
+      );
+      for (let index = 0; index < 5000; index += 1) {
+        state.storage.sql.exec(
+          `INSERT INTO session_events_v3 (event_id, item_id, group_id, key_timestamp, nonce, ciphertext, created_at)
+           VALUES (?, NULL, ?, 1, 'nonce', 'c', 1)`,
+          `event-${index}`,
+          groupId,
+        );
+      }
+    });
+    const capped = await api(`/api/sessions/${session.id}/events`, {
+      method: "POST",
+      token: session.sessionToken,
+      body: {
+        eventId: randomId(), groupId, keyTimestamp: 1, nonce: "AAAAAAAAAAAAAAAA", ciphertext: "AAAA", notificationKind: "none",
+      },
+    });
+    expect(capped.status).toBe(409);
+    expect(capped.json.error).toBe("session_limit");
+  });
+
   it("answers CORS only for the demo origin on API paths", async () => {
     const preflight = await SELF.fetch("https://opeco.link/api/sessions", {
       method: "OPTIONS",
-      headers: { origin: "https://demo.opeco.link", "access-control-request-method": "POST" },
+      headers: { origin: "https://demo.opeco.link", "access-control-request-method": "POST", "cf-connecting-ip": "203.0.113.1" },
     });
     expect(preflight.status).toBe(204);
     expect(preflight.headers.get("access-control-allow-origin")).toBe("https://demo.opeco.link");
@@ -150,20 +232,21 @@ describe("session relay", () => {
   });
 });
 
-async function createSession(): Promise<{ id: string; sessionToken: string }> {
+async function createSession(): Promise<{ id: string; sessionToken: string; pairingId: string }> {
   const id = randomId();
   const sessionToken = "session-token";
+  const pairingId = randomId();
   const created = await api("/api/sessions", {
     method: "POST",
     body: {
       sessionId: id,
       sessionTokenHash: await hash(sessionToken),
       creatorPublicKey: await creatorPublicKey(),
-      pairing: { id: randomId(), tokenHash: await hash("pairing-token") },
+      pairing: { id: pairingId, tokenHash: await hash("pairing-token") },
     },
   });
   expect(created.status).toBe(201);
-  return { id, sessionToken };
+  return { id, sessionToken, pairingId };
 }
 
 async function creatorPublicKey(): Promise<string> {
@@ -174,8 +257,8 @@ async function creatorPublicKey(): Promise<string> {
   return btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
 }
 
-async function api(path: string, options: { method?: string; token?: string; body?: unknown } = {}) {
-  const headers = new Headers();
+async function api(path: string, options: { method?: string; token?: string; body?: unknown; address?: string } = {}) {
+  const headers = new Headers({ "cf-connecting-ip": options.address ?? clientAddress() });
   if (options.token !== undefined) headers.set("authorization", `Bearer ${options.token}`);
   if (options.body !== undefined) headers.set("content-type", "application/json");
   const response = await SELF.fetch(`https://opeco.link${path}`, {
@@ -185,6 +268,12 @@ async function api(path: string, options: { method?: string; token?: string; bod
   });
   const json = response.status === 204 ? undefined : await response.json<Record<string, any>>();
   return { status: response.status, json };
+}
+
+let addressCounter = 0;
+function clientAddress(): string {
+  addressCounter += 1;
+  return `203.0.113.${addressCounter % 250}`;
 }
 
 async function hash(value: string): Promise<string> {

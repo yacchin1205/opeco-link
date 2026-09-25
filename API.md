@@ -135,6 +135,12 @@ Each endpoint below is one Operation at the client–Worker boundary. An Operati
 
 `Encryption` describes application-layer end-to-end encryption, independently of HTTPS transport encryption and signatures.
 
+### Service limits
+
+Operations that create server-side state are rate limited per client address and per minute: Session creation 20, SessionPairing issuance 30, Device registration, Group creation, DeviceRequest creation, and approval 10 together. Event recording is limited to 300 per Session per minute; Response recording and SessionAttachment reservation and upload to 60 per Session per minute. A limited request receives `429` with `error: rate_limited` and a `Retry-After` header, and may be repeated later unchanged.
+
+A Session holds at most 5,000 Events totaling 64 MiB of ciphertext, 100 SessionPairings, 5,000 Responses, and 100 SessionAttachments totaling 256 MiB of ciphertext. An Operation that would exceed a cap is rejected with `409` and `error: session_limit`; the cap is permanent for that Session, so the creating process closes it and creates a new one. These values are service policy and may change; they are not protocol constants.
+
 ### `GET /api/health`
 
 Authentication: none. Authorization: none.
