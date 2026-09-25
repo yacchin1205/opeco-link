@@ -2,6 +2,7 @@ node_modules/
 .DS_Store
 .wrangler/
 .web-dist/
+.docs-dist/
 dist/
 coverage/
 playwright-report/
