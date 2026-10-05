@@ -158,6 +158,9 @@ Verified plaintext is written below the operating system's temporary directory, 
 
 The image URL is reachable only from the same machine as the `opeco` process. When MCP runs in a container, on a remote host, or across SSH without port forwarding, use the pairing URL instead.
 
+Use [Agent hooks](examples/agent-hooks/README.md) with Codex or Claude to receive
+new-response reminders and reminders to update stale status.
+
 ## Security notes
 
 - Treat an unused pairing QR code or URL as a temporary secret.

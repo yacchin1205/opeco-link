@@ -19,6 +19,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -166,6 +167,26 @@ func TestMCPEncryptedRoundTrip(t *testing.T) {
 	// A device can write at any time and nothing pushes the message to the agent,
 	// so every send hands over what arrived before it.
 	feedbackID := postEncryptedFeedback(t, ctx, api, created.SessionID, "Anything else to check?", groups[0], eventsExpiry)
+	type hookOutput struct {
+		Decision string `json:"decision"`
+		Reason   string `json:"reason"`
+	}
+	checkHooks := func(active bool) []hookOutput {
+		return []hookOutput{
+			callTool[hookOutput](t, ctx, clientSession, "codex_hook_check", map[string]any{"event": "Stop", "stop_hook_active": active}),
+			callTool[hookOutput](t, ctx, clientSession, "claude_hook_check", map[string]any{"event": "Stop", "stop_hook_active": strconv.FormatBool(active)}),
+		}
+	}
+	for _, hook := range checkHooks(false) {
+		if hook.Decision != "block" || !strings.Contains(hook.Reason, created.SessionID) {
+			t.Fatalf("missing non-consuming hook reminder: %+v", hook)
+		}
+	}
+	for _, continuedHook := range checkHooks(true) {
+		if continuedHook.Decision != "" {
+			t.Fatal("hook repeated a Stop continuation")
+		}
+	}
 	afterFeedback := callTool[deliveredToolOutput](t, ctx, clientSession, "status", map[string]any{
 		"session_id": created.SessionID, "status": "Draining device messages",
 	})
@@ -181,9 +202,19 @@ func TestMCPEncryptedRoundTrip(t *testing.T) {
 	if len(drained.Responses) != 0 {
 		t.Fatalf("responses_wait returned %d already handed over responses, want 0", len(drained.Responses))
 	}
+	for _, clearedHook := range checkHooks(false) {
+		if clearedHook.Decision != "" {
+			t.Fatal("hook continued after the response was consumed")
+		}
+	}
 
 	_, attachmentExpiry := fetchAndDecryptEvents(t, ctx, api, created.SessionID, groups[0])
 	attachmentResponseID, jpeg := postEncryptedAttachment(t, ctx, api, created.SessionID, groups[0], attachmentExpiry)
+	for _, photoHook := range checkHooks(false) {
+		if photoHook.Decision != "block" {
+			t.Fatal("hook missed a photo-only response")
+		}
+	}
 	attachmentResult, rawAttachmentResult := callToolResult[responsesToolOutput](t, ctx, clientSession, "responses_wait", map[string]any{
 		"session_id": created.SessionID, "timeout_seconds": 5,
 	})

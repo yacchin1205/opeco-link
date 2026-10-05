@@ -1,0 +1,37 @@
+{
+  "description": "opeco.link response and status reminders for Codex.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "opeco-link",
+            "tool": "codex_hook_check",
+            "input": {
+              "event": "PostToolUse"
+            },
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "opeco-link",
+            "tool": "codex_hook_check",
+            "input": {
+              "event": "Stop",
+              "stop_hook_active": "${stop_hook_active}"
+            },
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  }
+}
