@@ -17,6 +17,7 @@ type Server struct {
 	store  *notify.Store
 	viewer *notify.QRViewer
 	opener browser.Opener
+	hooks  hookState
 }
 
 func New(store *notify.Store, viewer *notify.QRViewer, opener browser.Opener) *Server {
@@ -68,6 +69,15 @@ func (s *Server) Run(ctx context.Context) error {
 		Name:        "responses_wait",
 		Description: "Wait for and return every encrypted choice, dismissal, or message not yet handed over. The agent decides how to interpret them.",
 	}, s.waitResponses)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "codex_hook_check",
+		Description: "Codex lifecycle hook. Remind the agent about unread client responses and stale status without consuming responses or creating a session. Use responses_wait to retrieve responses and photos.",
+	}, s.checkHook)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "claude_hook_check",
+		Description: "Claude lifecycle hook. Remind the agent about unread client responses and stale status without consuming responses or creating a session. Use responses_wait to retrieve responses and photos.",
+	}, s.checkClaudeHook)
+
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "session_close",
 		Description: "Immediately close a session and remove its card from devices, handing over any unread responses. Call it when the user asks for a separate session, since session_create otherwise returns the running one. Do not call this for ordinary process exit.",
@@ -210,7 +220,15 @@ type statusInput struct {
 }
 
 func (s *Server) status(ctx context.Context, _ *mcp.CallToolRequest, input statusInput) (*mcp.CallToolResult, deliveredOutput, error) {
-	if err := s.store.SendStatus(ctx, input.SessionID, input.Status); err != nil {
+	s.hooks.mu.Lock()
+	err := s.store.SendStatus(ctx, input.SessionID, input.Status)
+	if err == nil {
+		s.hooks.statusSession, s.hooks.status = input.SessionID, input.Status
+		s.hooks.statusUpdated = time.Now()
+		s.hooks.statusWarned = time.Time{}
+	}
+	s.hooks.mu.Unlock()
+	if err != nil {
 		return nil, deliveredOutput{}, err
 	}
 	responses := s.drainResponses(ctx, input.SessionID)

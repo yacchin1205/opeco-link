@@ -319,6 +319,13 @@ func TestV4ResponsesSkipStaleEpochAndAdvanceCursor(t *testing.T) {
 	store := NewStore(api)
 	store.sessions[sessionID] = session
 
+	for range 2 {
+		id, count, through, err := store.PendingResponses(context.Background())
+		if err != nil || id != sessionID || count != 2 || through != 2 || session.responseCursor != 0 {
+			t.Fatalf("non-consuming hook check: id=%s count=%d through=%d cursor=%d err=%v", id, count, through, session.responseCursor, err)
+		}
+	}
+	requestedAfter = requestedAfter[:0]
 	responses, err := store.Responses(context.Background(), sessionID)
 	if err != nil {
 		t.Fatal(err)

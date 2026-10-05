@@ -513,6 +513,32 @@ func (s *Store) CloseRequest(ctx context.Context, sessionID, requestID string) e
 	return nil
 }
 
+// PendingResponses checks for unread envelopes without moving the response
+// cursor or handing over their contents. A hook can safely prompt the agent to
+// call Responses even if its own output is lost. No session is created here.
+func (s *Store) PendingResponses(ctx context.Context) (sessionID string, count int, through int64, err error) {
+	sessionID = s.anySessionID()
+	if sessionID == "" {
+		return
+	}
+	session, err := s.session(sessionID)
+	if err != nil {
+		return sessionID, 0, 0, err
+	}
+	session.mu.Lock()
+	defer session.mu.Unlock()
+	result, err := s.api.responses(ctx, session.id, session.sessionToken, session.responseCursor)
+	if err != nil {
+		return sessionID, 0, 0, err
+	}
+	for _, envelope := range result.Responses {
+		if envelope.Sequence > through {
+			through = envelope.Sequence
+		}
+	}
+	return sessionID, len(result.Responses), through, nil
+}
+
 func (s *Store) Responses(ctx context.Context, sessionID string) ([]Response, error) {
 	if _, err := s.RefreshGroups(ctx, sessionID); err != nil {
 		return nil, err
