@@ -3,6 +3,7 @@ import SwiftUI
 
 struct JoinSessionView: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.openURL) private var openURL
     @Binding var isPresented: Bool
     @State private var cameraAuthorization = AVCaptureDevice.authorizationStatus(for: .video)
     @State private var pairingLink = ""
@@ -60,15 +61,17 @@ struct JoinSessionView: View {
             } description: {
                 Text("Camera access is used only to scan a session QR code or a QR code for adding a device to a group.")
             } actions: {
-                Button("Allow camera") { requestCameraAccess() }
+                Button("Next") { requestCameraAccess() }
                     .buttonStyle(.borderedProminent)
             }
         case .denied, .restricted:
-            ContentUnavailableView(
-                "Camera unavailable",
-                systemImage: "camera.fill",
-                description: Text("Paste the pairing link below, or allow camera access in Settings.")
-            )
+            ContentUnavailableView {
+                Label("Camera unavailable", systemImage: "camera.fill")
+            } description: {
+                Text("Paste the pairing link below, or allow camera access in Settings.")
+            } actions: {
+                Button("Open Settings") { openURL(URL(string: UIApplication.openSettingsURLString)!) }
+            }
         @unknown default:
             ContentUnavailableView("Unknown camera state", systemImage: "exclamationmark.triangle")
         }
