@@ -577,7 +577,7 @@ final class DeviceGroupFlowUITests: XCTestCase {
         XCTAssertTrue(takePhoto.exists)
         XCTAssertTrue(choosePhoto.exists)
         XCTAssertFalse(send.isEnabled)
-        attachScreenshot(named: "50-v4-feedback-empty-with-photo-actions", app: app)
+        attachScreenshot(named: "50-v4-feedback-empty-with-placeholder-and-photo-actions", app: app)
 
         choosePhoto.tap()
         let photoThumbnail = app.images.matching(identifier: "PXGGridLayout-Info").firstMatch
@@ -813,6 +813,40 @@ final class DeviceGroupFlowUITests: XCTestCase {
         app.buttons["Dismiss error"].tap()
         XCTAssertFalse(errorMessage.exists)
         attachScreenshot(named: "42-join-error-acknowledged", app: app)
+    }
+
+    func testCameraExplanationLeavesTheChoiceToTheSystemPrompt() {
+        let app = XCUIApplication()
+        app.resetAuthorizationStatus(for: .camera)
+        app.launchArguments = ["-ui-test-session-history"]
+        app.launch()
+        let scan = app.buttons["Scan QR code"].firstMatch
+        XCTAssertTrue(scan.waitForExistence(timeout: 5))
+        scan.tap()
+
+        let next = app.buttons["Next"]
+        XCTAssertTrue(app.staticTexts["Camera access"].waitForExistence(timeout: 5))
+        XCTAssertTrue(next.exists)
+        XCTAssertFalse(app.buttons["Allow camera"].exists)
+        attachScreenshot(named: "43-camera-explanation", app: app)
+
+        next.tap()
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let prompt = springboard.alerts.firstMatch
+        XCTAssertTrue(prompt.waitForExistence(timeout: 5))
+        attachScreenshot(named: "44-camera-system-prompt", screen: XCUIScreen.main)
+        prompt.buttons.element(boundBy: 0).tap()
+
+        let openSettings = app.buttons["Open Settings"]
+        XCTAssertTrue(app.staticTexts["Camera unavailable"].waitForExistence(timeout: 5))
+        XCTAssertTrue(openSettings.exists)
+        attachScreenshot(named: "45-camera-denied-offers-settings", app: app)
+
+        openSettings.tap()
+        let settings = XCUIApplication(bundleIdentifier: "com.apple.Preferences")
+        XCTAssertTrue(settings.wait(for: .runningForeground, timeout: 10))
+        XCTAssertTrue(settings.navigationBars.firstMatch.waitForExistence(timeout: 10))
+        attachScreenshot(named: "46-camera-settings-opened", screen: XCUIScreen.main)
     }
 
     private var sessionLinkFixture: String {

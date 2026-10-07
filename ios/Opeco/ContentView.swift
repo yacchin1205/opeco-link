@@ -788,6 +788,16 @@ private struct FeedbackView: View {
             VStack(spacing: 16) {
                 TextEditor(text: $message)
                     .frame(minHeight: 120, maxHeight: 220)
+                    .overlay(alignment: .topLeading) {
+                        if message.isEmpty {
+                            Text("Message")
+                                .foregroundStyle(.tertiary)
+                                .padding(.top, 8)
+                                .padding(.leading, 5)
+                                .allowsHitTesting(false)
+                                .accessibilityHidden(true)
+                        }
+                    }
                     .accessibilityLabel("Message")
                 if protocolVersion == 4 {
                     ScrollView(.horizontal) {
