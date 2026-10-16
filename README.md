@@ -6,7 +6,9 @@ opeco.link connects a short-lived Agent or CLI session to one or more device gro
 
 There are no user accounts and no recovery flow. A session expires one day after its creator's last activity. The relay stores ciphertext and routing metadata, but does not receive application payloads in plaintext. The web client must still trust the JavaScript served by its origin.
 
-The PWA is available at [opeco.link](https://opeco.link).
+The iOS/iPadOS and macOS apps are available on the App Store, and the PWA at [opeco.link](https://opeco.link).
+
+<a href="https://apps.apple.com/app/id6814018543"><img src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us" alt="Download on the App Store" height="40"></a>
 
 A demo that plays the agent's part runs at [demo.opeco.link](https://demo.opeco.link): open it, scan the QR code with the app, and send notifications, questions, and status updates from the page.
 
