@@ -45,6 +45,8 @@ final class AppModel: ObservableObject, AppCommandStateOwner {
     private var pendingDeviceAddition: String?
     private var pendingUniversalLinks: [URL] = []
     private let linkLogger = Logger(subsystem: "link.opeco.app", category: "LinkReception")
+    private let syncLogger = Logger(subsystem: "link.opeco.app", category: "Sync")
+    private let errorLogger = Logger(subsystem: "link.opeco.app", category: "Error")
     private var pendingUniversalLinkTask: Task<Void, Never>?
     private var hasFinishedStarting = false
     private var didReportDisabledBadges = false
@@ -488,6 +490,7 @@ final class AppModel: ObservableObject, AppCommandStateOwner {
 
     private func performSync() async {
         let previousConnectionState = connectionState
+        let previousFailures = syncFailures.mapValues(\.localizedDescription)
         connectionState = .syncing
         defer {
             schedulePendingUniversalLink()
@@ -505,6 +508,17 @@ final class AppModel: ObservableObject, AppCommandStateOwner {
         } catch {
             syncFailures[.shared] = error
             connectionState = .failed
+        }
+        // The loop syncs every two seconds, so only changes are logged.
+        let failures = syncFailures.mapValues(\.localizedDescription)
+        if failures != previousFailures {
+            if failures.isEmpty { syncLogger.notice("Sync recovered") }
+            for (scope, message) in failures {
+                switch scope {
+                case .shared: syncLogger.error("Sync failed: \(message, privacy: .public)")
+                case .session(let id): syncLogger.error("Session \(id) sync failed: \(message, privacy: .public)")
+                }
+            }
         }
         do {
             deviceRequestLink = try pendingDeviceRequest.map(deviceRequestURL)
@@ -595,6 +609,7 @@ final class AppModel: ObservableObject, AppCommandStateOwner {
     }
 
     private func failStartup(_ message: String, canReset: Bool) {
+        errorLogger.error("Startup failed: \(message, privacy: .public)")
         hasFinishedStarting = false
         startupErrorMessage = message
         canResetLocalData = canReset
@@ -606,6 +621,7 @@ final class AppModel: ObservableObject, AppCommandStateOwner {
     }
 
     func reportError(_ message: String) {
+        errorLogger.error("\(message, privacy: .public)")
         if !operationErrors.contains(message) { operationErrors.append(message) }
     }
 
