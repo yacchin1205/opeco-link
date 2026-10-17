@@ -59,9 +59,10 @@ func TestMCPEncryptedRoundTrip(t *testing.T) {
 		t.Fatalf("first session_create should have created an unjoined session: %+v", created)
 	}
 	assertNoTerminalQRCode(t, created.TerminalQRCode)
-	assertQRImage(t, created.QRImageURL)
+	assertInvitationPage(t, created.QRImageURL, false)
 	assertQRNotOpened(t, created.QROpened, created.QROpenError)
 	joined := joinFromPairingURL(t, ctx, api, created.PairingURL)
+	assertInvitationPage(t, created.QRImageURL, true)
 
 	waited := callTool[waitDeviceToolOutput](t, ctx, clientSession, "session_wait_for_device", map[string]any{
 		"session_id": created.SessionID, "timeout_seconds": 5,
@@ -92,9 +93,10 @@ func TestMCPEncryptedRoundTrip(t *testing.T) {
 		t.Fatal("additional pairing reused the initial one-shot URL")
 	}
 	assertNoTerminalQRCode(t, additionalPairing.TerminalQRCode)
-	assertQRImage(t, additionalPairing.QRImageURL)
+	assertInvitationPage(t, additionalPairing.QRImageURL, false)
 	assertQRNotOpened(t, additionalPairing.QROpened, additionalPairing.QROpenError)
 	secondGroup := joinFromPairingURL(t, ctx, api, additionalPairing.PairingURL)
+	assertInvitationPage(t, additionalPairing.QRImageURL, true)
 	waited = callTool[waitDeviceToolOutput](t, ctx, clientSession, "session_wait_for_device", map[string]any{
 		"session_id": created.SessionID, "timeout_seconds": 5,
 	})
@@ -284,23 +286,44 @@ func assertQRNotOpened(t *testing.T, opened bool, openError string) {
 	}
 }
 
-func assertQRImage(t *testing.T, imageURL string) {
+// assertInvitationPage checks that the page offers its pairing until a device
+// group uses it, then reports the join once and stops offering the pairing.
+func assertInvitationPage(t *testing.T, pageURL string, used bool) {
 	t.Helper()
-	parsed, err := url.Parse(imageURL)
+	parsed, err := url.Parse(pageURL)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if parsed.Scheme != "http" || parsed.Hostname() != "127.0.0.1" {
-		t.Fatalf("QR image URL = %q, want an HTTP IPv4 loopback URL", imageURL)
+		t.Fatalf("QR page URL = %q, want an HTTP IPv4 loopback URL", pageURL)
 	}
-	client := &http.Client{Timeout: 5 * time.Second}
-	response, err := client.Get(imageURL)
+	client := &http.Client{Timeout: 25 * time.Second}
+	response, err := client.Get(pageURL + "/status")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var status struct {
+		Joined bool `json:"joined"`
+	}
+	err = json.NewDecoder(response.Body).Decode(&status)
+	response.Body.Close()
+	if err != nil {
+		t.Fatalf("decode QR page status (HTTP %d): %v", response.StatusCode, err)
+	}
+	if response.StatusCode != http.StatusOK || status.Joined != used {
+		t.Fatalf("QR page status = %d joined=%v, want joined=%v", response.StatusCode, status.Joined, used)
+	}
+	response, err = client.Get(pageURL)
 	if err != nil {
 		t.Fatal(err)
 	}
 	response.Body.Close()
-	if response.StatusCode != http.StatusOK || response.Header.Get("Content-Type") != "image/png" {
-		t.Fatalf("QR image response status = %d, Content-Type = %q", response.StatusCode, response.Header.Get("Content-Type"))
+	want := http.StatusOK
+	if used {
+		want = http.StatusNotFound
+	}
+	if response.StatusCode != want {
+		t.Fatalf("QR page status = %d after joined=%v, want %d", response.StatusCode, used, want)
 	}
 }
 

@@ -133,7 +133,9 @@ func (s *Server) create(ctx context.Context, _ *mcp.CallToolRequest, input creat
 		PairingURL:       state.PairingURL,
 	}
 	if state.PairingURL != "" {
-		imageURL, err := s.viewer.Publish(state.PairingURL)
+		imageURL, err := s.viewer.Publish(state.PairingURL, func(ctx context.Context) (bool, error) {
+			return s.store.PairingJoined(ctx, state.SessionID, state.PairingURL)
+		})
 		if err != nil {
 			return nil, sessionOutput{}, err
 		}
@@ -159,7 +161,9 @@ func (s *Server) addPairing(ctx context.Context, _ *mcp.CallToolRequest, input s
 	if err != nil {
 		return nil, pairingOutput{}, err
 	}
-	imageURL, err := s.viewer.Publish(pairingURL)
+	imageURL, err := s.viewer.Publish(pairingURL, func(ctx context.Context) (bool, error) {
+		return s.store.PairingJoined(ctx, input.SessionID, pairingURL)
+	})
 	if err != nil {
 		return nil, pairingOutput{}, err
 	}
