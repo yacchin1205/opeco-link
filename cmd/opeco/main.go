@@ -134,7 +134,9 @@ func interactive(ctx context.Context, store *notify.Store, viewer *notify.QRView
 	if err != nil {
 		return err
 	}
-	imageURL, err := viewer.Publish(pairingURL)
+	imageURL, err := viewer.Publish(pairingURL, func(ctx context.Context) (bool, error) {
+		return store.PairingJoined(ctx, sessionID, pairingURL)
+	})
 	if err != nil {
 		return err
 	}
@@ -246,7 +248,9 @@ func runCommand(ctx context.Context, store *notify.Store, viewer *notify.QRViewe
 		if err != nil {
 			return false, err
 		}
-		imageURL, err := viewer.Publish(url)
+		imageURL, err := viewer.Publish(url, func(ctx context.Context) (bool, error) {
+			return store.PairingJoined(ctx, sessionID, url)
+		})
 		if err != nil {
 			return false, err
 		}

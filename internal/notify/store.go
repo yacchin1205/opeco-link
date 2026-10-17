@@ -221,6 +221,38 @@ func (s *Store) AddPairing(ctx context.Context, sessionID string) (string, error
 	return s.api.JoinURL(session.id, pairing, session.publicKey, session.color, session.protocolVersion), nil
 }
 
+// PairingJoined reports whether a device group has joined through the pairing
+// in pairingURL, a link this store created for the session.
+func (s *Store) PairingJoined(ctx context.Context, sessionID, pairingURL string) (bool, error) {
+	parsed, err := url.Parse(pairingURL)
+	if err != nil {
+		return false, fmt.Errorf("parse pairing URL: %w", err)
+	}
+	fragment, err := url.ParseQuery(parsed.Fragment)
+	if err != nil {
+		return false, fmt.Errorf("parse pairing URL fragment: %w", err)
+	}
+	pairingID := fragment.Get("p")
+	session, err := s.session(sessionID)
+	if err != nil {
+		return false, err
+	}
+	session.mu.Lock()
+	defer session.mu.Unlock()
+	if _, known := session.pairings[pairingID]; !known {
+		return false, fmt.Errorf("pairing URL does not belong to session %q", sessionID)
+	}
+	if _, err := s.refreshGroupsLocked(ctx, session); err != nil {
+		return false, err
+	}
+	for _, group := range session.groups {
+		if group.PairingID == pairingID {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (s *Store) RefreshGroups(ctx context.Context, sessionID string) (int, error) {
 	session, err := s.session(sessionID)
 	if err != nil {

@@ -43,8 +43,9 @@ closed; do not close it defensively.
 
 `session_create` and `session_pairing_create` provide:
 
-- `qr_image_url`: a loopback PNG held in memory. `opeco` opens it in the default
-  browser of its own machine and reports the outcome.
+- `qr_image_url`: a loopback invitation page held in memory, showing the QR code
+  and the pairing link. `opeco` opens it in the default browser of its own
+  machine and reports the outcome.
 - `qr_opened`: true when the browser command succeeded. Tell the person the QR
   code is in their browser window and then wait.
 - `qr_open_error`: present when nothing opened, with the reason (an SSH session,
@@ -66,8 +67,9 @@ Call `session_wait_for_device` before sending any event. Only
 about 60–120 seconds so the user can regain control. A timeout is reported as a
 tool error and is not a failed pairing; retry if still appropriate.
 
-The QR image expires after ten minutes or when `opeco` exits. If it returns
-404, create another pairing. Adding a device to an already joined device group
+The page expires after ten minutes, once a device group uses its pairing, or
+when `opeco` exits. If it returns 404 before anyone joined, create another
+pairing. Adding a device to an already joined device group
 happens inside the app and requires approval from an existing device; it does
 not use a session pairing.
 

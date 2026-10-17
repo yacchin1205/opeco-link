@@ -81,7 +81,7 @@ Start a session:
 opeco --interactive --title "Deployment"
 ```
 
-The CLI prints a terminal QR code, its pairing URL, and a `QR image` URL such as `http://127.0.0.1:49152/qr/...`, then opens that URL in the default browser to display a full-size QR image without creating a file. Scan it with the receiving device. The CLI reports whether the browser opened, and reports when a new device group starts receiving the session.
+The CLI prints a terminal QR code, its pairing URL, and a `QR image` URL such as `http://127.0.0.1:49152/qr/...`, then opens that URL in the default browser without creating a file. The page shows a full-size QR code, the pairing link with a copy button, and a link to the App Store. Scan the QR code with the receiving device, or copy the link to open it in an app on the same computer. Once a device group joins through it, the page stops showing the pairing and closes its tab when the browser allows a script to close it. The CLI reports whether the browser opened, and reports when a new device group starts receiving the session.
 
 The browser is not opened inside an SSH session, where it would appear on the remote display, and `--no-browser` suppresses it everywhere. The QR image URL is printed either way, so it can be opened by hand.
 
@@ -110,7 +110,7 @@ quit
 - `color` changes the card color during the session; use `color random` to select another pastel color.
 - `status` updates the card silently, unless the device is watching the session: long-press the opeco icon beside the session on iOS or macOS to toggle watching, and every status update then shows a generic status-updated alert, collapsed to the latest one. `notify` returns the item ID used to identify a later dismissal and shows a generic new-notification alert, while `request` shows a generic input-requested alert. Encrypted event content is not included in any OS alert. The PWA has no OS push notifications or session watching.
 - `close-request` ends the identified request on connected devices.
-- Each local QR image remains available for 10 minutes or until `opeco` exits. It is held only in process memory, and the response prevents browser caching. `pair` opens the new image in the browser under the same rules as startup.
+- Each local invitation page remains available for 10 minutes, until a device group uses its pairing, or until `opeco` exits. It is held only in process memory, and the response prevents browser caching. `pair` opens the new page in the browser under the same rules as startup.
 - `responses` retrieves every choice response, request dismissal, and free-form message without selecting or aggregating them.
 - `close` immediately deletes the session and removes its card from connected browsers.
 - `quit` only exits the CLI. The session remains until its normal expiry, but its creator keys are lost with the process.
@@ -158,7 +158,7 @@ Verified plaintext is written below the operating system's temporary directory, 
 
 `opeco` opens `qr_image_url` in the default browser of its own machine and reports the outcome: `qr_opened` is true when the browser command succeeded, and `qr_open_error` otherwise explains why nothing opened, such as an SSH session, a missing `open` or `xdg-open`, or `--no-browser` in the MCP `args`. When nothing opened, ask the person to open `qr_image_url` in a browser.
 
-The image URL is reachable only from the same machine as the `opeco` process. When MCP runs in a container, on a remote host, or across SSH without port forwarding, use the pairing URL instead.
+The page URL is reachable only from the same machine as the `opeco` process. When MCP runs in a container, on a remote host, or across SSH without port forwarding, use the pairing URL instead.
 
 Use [Agent hooks](examples/agent-hooks/README.md) with Codex or Claude to receive
 new-response reminders and reminders to update stale status.
@@ -166,7 +166,7 @@ new-response reminders and reminders to update stale status.
 ## Security notes
 
 - Treat an unused pairing QR code or URL as a temporary secret.
-- Local QR images use an opaque, independently generated loopback URL. The URL contains no pairing data and expires after 10 minutes, but anyone who can view the image can use the underlying one-shot pairing secret. Interactive and MCP modes open the image in the default browser of the machine running `opeco`, so on a shared or remotely viewed display start `opeco` with `--no-browser`.
+- Local invitation pages use an opaque, independently generated loopback URL. The URL contains no pairing data and expires after 10 minutes, but anyone who can view the page can use the underlying one-shot pairing secret. The page loads nothing from other origins. Interactive and MCP modes open the page in the default browser of the machine running `opeco`, so on a shared or remotely viewed display start `opeco` with `--no-browser`.
 - Interactive and MCP session management keys exist only in process memory. Shell sessions keep keys and authentication state in an OS temporary directory (`0700`) and file (`0600`) where those modes apply. Treat that file as a secret: anyone who can read it can control the session and decrypt its messages. Do not share, back up, or commit it. Cleanup is not secure erasure, and missing keys are not recoverable.
 - The relay can observe metadata such as timestamps, identifiers, and ciphertext sizes.
 - Attachment objects in R2 are ciphertext only. They are removed after `opeco` has advanced past the response and polls again, or when the session expires; an uploaded attachment that is never committed can remain until session expiry.
