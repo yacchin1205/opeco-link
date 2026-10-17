@@ -410,6 +410,32 @@ final class MenuBarFlowUITests: XCTestCase {
         XCTAssertFalse(app.windows["Add Session"].exists)
     }
 
+    func testSessionsWindowTilesCardsToFitItsWidth() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-ui-test-session-history", "-ui-test-ipad-layout"]
+        app.launch()
+
+        XCTAssertTrue(app.menuBars.statusItems.firstMatch.waitForExistence(timeout: 5))
+        app.open(try XCTUnwrap(URL(string: "opecolink://sessions")))
+        let window = app.windows["Sessions"]
+        XCTAssertTrue(window.waitForExistence(timeout: 5))
+        let titles = ["Build pipeline", "Security audit", "UI improvement test"].map { window.staticTexts[$0] }
+        XCTAssertTrue(titles[0].waitForExistence(timeout: 5))
+        XCTAssertFalse(window.buttons["Quit"].exists)
+
+        resize(window, toWidth: 1100)
+        XCTAssertEqual(columnCount(of: titles), 3)
+        attachScreenshot(named: "08-sessions-window-three-columns", element: window)
+
+        resize(window, toWidth: 760)
+        XCTAssertEqual(columnCount(of: titles), 2)
+        attachScreenshot(named: "09-sessions-window-two-columns", element: window)
+
+        resize(window, toWidth: 440)
+        XCTAssertEqual(columnCount(of: titles), 1)
+        attachScreenshot(named: "10-sessions-window-one-column", element: window)
+    }
+
     func testDeviceAdditionRequiresConfirmationAndCanBeCancelled() {
         let app = XCUIApplication()
         app.launchArguments = ["-ui-test-device-addition-approval"]
@@ -484,6 +510,24 @@ final class MenuBarFlowUITests: XCTestCase {
 
     private func absence(of element: XCUIElement) -> XCTestExpectation {
         XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: element)
+    }
+
+    private func resize(_ window: XCUIElement, toWidth width: CGFloat) {
+        let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1))
+            .withOffset(CGVector(dx: -2, dy: -2))
+        corner.press(forDuration: 0.2, thenDragTo: corner.withOffset(CGVector(dx: width - window.frame.width, dy: 0)))
+        XCTAssertEqual(window.frame.width, width, accuracy: 4)
+    }
+
+    private func columnCount(of elements: [XCUIElement]) -> Int {
+        Set(elements.map { Int($0.frame.minX.rounded()) }).count
+    }
+
+    private func attachScreenshot(named name: String, element: XCUIElement) {
+        let attachment = XCTAttachment(screenshot: element.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     private func attachScreenshot(named name: String, app: XCUIApplication) {

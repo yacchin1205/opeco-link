@@ -4,19 +4,35 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct MacMenuBarView: View {
+    enum Presentation {
+        case popover
+        case window
+    }
+
     @EnvironmentObject private var model: AppModel
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismiss) private var dismiss
+    var presentation = Presentation.popover
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider()
-            content
-            Divider()
-            footer
+        switch presentation {
+        case .popover:
+            VStack(spacing: 0) {
+                header
+                Divider()
+                content
+                Divider()
+                footer
+            }
+            .frame(width: 390)
+        case .window:
+            VStack(spacing: 0) {
+                header
+                Divider()
+                content
+            }
+            .frame(minWidth: 420, minHeight: 360)
         }
-        .frame(width: 390)
     }
 
     private var header: some View {
@@ -27,7 +43,7 @@ struct MacMenuBarView: View {
             Spacer()
             Button {
                 openWindow(id: "device-group")
-                dismiss()
+                if presentation == .popover { dismiss() }
             } label: {
                 Image(systemName: "macbook.and.iphone")
                     .font(.system(size: 15, weight: .medium))
@@ -77,7 +93,7 @@ struct MacMenuBarView: View {
                 .frame(maxWidth: .infinity, minHeight: 180)
         } else {
             ScrollView {
-                LazyVStack(spacing: 12) {
+                VStack(spacing: 12) {
 #if DEBUG
                     if model.isSyncRecoveryUITest {
                         Button("Restore test connection") {
@@ -97,9 +113,7 @@ struct MacMenuBarView: View {
                     if let notice = model.noticeMessage {
                         MacNoticeBanner(message: notice)
                     }
-                    ForEach(model.sessions) { session in
-                        MacSessionCard(session: session)
-                    }
+                    sessionCards
                     if model.sessions.isEmpty {
                         ContentUnavailableView {
                             VStack(spacing: 6) {
@@ -122,9 +136,35 @@ struct MacMenuBarView: View {
                         .frame(minHeight: 220)
                     }
                 }
-                .padding(12)
+                .padding(presentation == .popover ? 12 : 16)
             }
-            .frame(minHeight: 280, idealHeight: 480, maxHeight: 620)
+            .frame(
+                minHeight: 280,
+                idealHeight: 480,
+                maxHeight: presentation == .popover ? 620 : .infinity
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var sessionCards: some View {
+        switch presentation {
+        case .popover:
+            LazyVStack(spacing: 12) {
+                ForEach(model.sessions) { session in
+                    MacSessionCard(session: session)
+                }
+            }
+        case .window:
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 340), spacing: 16, alignment: .top)],
+                alignment: .leading,
+                spacing: 16
+            ) {
+                ForEach(model.sessions) { session in
+                    MacSessionCard(session: session)
+                }
+            }
         }
     }
 

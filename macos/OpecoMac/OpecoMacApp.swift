@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import OSLog
 import SwiftUI
 
 @main
@@ -30,7 +31,7 @@ struct OpecoMacApp: App {
         .defaultSize(width: 520, height: 620)
 
         Window("Sessions", id: "sessions") {
-            MacMenuBarView()
+            MacMenuBarView(presentation: .window)
                 .environmentObject(model)
                 .handlesExternalEvents(
                     preferring: ["opecolink://sessions"],
@@ -38,7 +39,7 @@ struct OpecoMacApp: App {
                 )
         }
         .handlesExternalEvents(matching: ["opecolink://sessions"])
-        .defaultSize(width: 420, height: 620)
+        .defaultSize(width: 1100, height: 720)
 
         Window("Add Device", id: "device-addition-approval") {
             MacDeviceAdditionApprovalView()
@@ -156,6 +157,7 @@ final class MacRuntime: ObservableObject {
     @Published private(set) var sessionsWindowRequest = 0
 
     private let widgetSnapshotCoordinator: WidgetSnapshotCoordinator
+    private let logger = Logger(subsystem: "link.opeco.app", category: "Lifecycle")
     private var started = false
 
     private init() {
@@ -183,8 +185,15 @@ final class MacRuntime: ObservableObject {
         }
     }
 
-    @objc private func willSleep() { model.setAutomaticSyncEnabled(false) }
-    @objc private func didWake() { model.setAutomaticSyncEnabled(true) }
+    @objc private func willSleep() {
+        logger.notice("System will sleep; pausing sync")
+        model.setAutomaticSyncEnabled(false)
+    }
+
+    @objc private func didWake() {
+        logger.notice("System woke; resuming sync")
+        model.setAutomaticSyncEnabled(true)
+    }
 
     func open(_ url: URL) {
         start()
