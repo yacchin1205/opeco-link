@@ -395,6 +395,46 @@ final class MenuBarFlowUITests: XCTestCase {
         attachScreenshot(named: "06-device-group-window", app: app)
     }
 
+    func testSettingsTurnOpenAtLoginOnAndOff() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-ui-test-session-history"]
+        app.launch()
+
+        let statusItem = app.menuBars.statusItems["opeco, 3 unresolved items"]
+        XCTAssertTrue(statusItem.waitForExistence(timeout: 5))
+        statusItem.click()
+        XCTAssertTrue(app.buttons["Settings"].waitForExistence(timeout: 5))
+        attachScreenshot(named: "10-menu-bar-settings-button", app: app)
+        app.buttons["Settings"].click()
+        let toggle = app.switches["open-at-login"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Quit"].isHittable)
+        XCTAssertEqual(toggle.value as? Int, 0)
+        attachScreenshot(named: "11-settings-open-at-login-off", app: app)
+
+        toggle.click()
+        XCTAssertEqual(toggle.value as? Int, 1)
+        XCTAssertFalse(app.staticTexts["settings-error"].exists)
+        reopenSettings(app, statusItem: statusItem, toggle: toggle)
+        XCTAssertEqual(toggle.value as? Int, 1)
+        attachScreenshot(named: "12-settings-open-at-login-on", app: app)
+
+        toggle.click()
+        XCTAssertEqual(toggle.value as? Int, 0)
+        XCTAssertFalse(app.staticTexts["settings-error"].exists)
+        reopenSettings(app, statusItem: statusItem, toggle: toggle)
+        XCTAssertEqual(toggle.value as? Int, 0)
+        attachScreenshot(named: "13-settings-open-at-login-off-again", app: app)
+    }
+
+    private func reopenSettings(_ app: XCUIApplication, statusItem: XCUIElement, toggle: XCUIElement) {
+        app.typeKey("w", modifierFlags: .command)
+        wait(for: [absence(of: toggle)], timeout: 5)
+        statusItem.click()
+        app.buttons["Settings"].click()
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+    }
+
     func testSessionsWidgetLinkOpensSessionsWindow() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-ui-test-session-history"]

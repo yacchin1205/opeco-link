@@ -11,6 +11,7 @@ struct MacMenuBarView: View {
 
     @EnvironmentObject private var model: AppModel
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
     @Environment(\.dismiss) private var dismiss
     var presentation = Presentation.popover
 
@@ -170,6 +171,12 @@ struct MacMenuBarView: View {
 
     private var footer: some View {
         HStack {
+            Button("Settings", systemImage: "gearshape") {
+                NSApp.activate(ignoringOtherApps: true)
+                openSettings()
+                dismiss()
+            }
+            .labelStyle(.iconOnly)
             Spacer()
             Button("Quit") { NSApplication.shared.terminate(nil) }
         }

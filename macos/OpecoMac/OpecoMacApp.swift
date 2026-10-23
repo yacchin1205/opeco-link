@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import OSLog
+import ServiceManagement
 import SwiftUI
 
 @main
@@ -46,6 +47,51 @@ struct OpecoMacApp: App {
                 .environmentObject(model)
         }
         .windowResizability(.contentSize)
+
+        Settings {
+            MacSettingsView()
+                .environmentObject(model)
+        }
+    }
+}
+
+private struct MacSettingsView: View {
+    @EnvironmentObject private var model: AppModel
+    @State private var loginItemStatus = SMAppService.mainApp.status
+
+    var body: some View {
+        Form {
+            Toggle("Open at Login", isOn: Binding(get: { loginItemStatus == .enabled }, set: setOpenAtLogin))
+                .accessibilityIdentifier("open-at-login")
+            if loginItemStatus == .requiresApproval {
+                Button("Allow in System Settings") { SMAppService.openSystemSettingsLoginItems() }
+            }
+            if let error = model.errorMessage {
+                Text(error)
+                    .foregroundStyle(.red)
+                    .textSelection(.enabled)
+                    .accessibilityIdentifier("settings-error")
+            }
+        }
+        .formStyle(.grouped)
+        .scrollDisabled(true)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: 440)
+        // The person can also change this in System Settings.
+        .onAppear { loginItemStatus = SMAppService.mainApp.status }
+    }
+
+    private func setOpenAtLogin(_ enabled: Bool) {
+        do {
+            if enabled {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
+        } catch {
+            model.reportError("Open at Login could not be changed: \(error.localizedDescription)")
+        }
+        loginItemStatus = SMAppService.mainApp.status
     }
 }
 
