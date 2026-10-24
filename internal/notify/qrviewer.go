@@ -12,6 +12,7 @@ import (
 	"html/template"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -164,8 +165,13 @@ type QRViewer struct {
 	done     chan struct{}
 }
 
-func NewQRViewer() (*QRViewer, error) {
-	listener, err := net.Listen("tcp4", "127.0.0.1:0")
+// NewQRViewer serves invitation pages on the IPv4 loopback at port; 0 picks a
+// free port.
+func NewQRViewer(port int) (*QRViewer, error) {
+	if port < 0 || port > 65535 {
+		return nil, fmt.Errorf("QR code viewer port %d is out of range", port)
+	}
+	listener, err := net.Listen("tcp4", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
 	if err != nil {
 		return nil, fmt.Errorf("listen for QR code viewer: %w", err)
 	}

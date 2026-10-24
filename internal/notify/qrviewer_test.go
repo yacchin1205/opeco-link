@@ -3,7 +3,9 @@ package notify
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -12,7 +14,7 @@ import (
 )
 
 func TestQRViewerServesAnInvitationPageAtAnOpaqueLoopbackURL(t *testing.T) {
-	viewer, err := NewQRViewer()
+	viewer, err := NewQRViewer(0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +75,7 @@ func TestQRViewerServesAnInvitationPageAtAnOpaqueLoopbackURL(t *testing.T) {
 }
 
 func TestQRViewerStopsOfferingAPairingOnceItIsUsed(t *testing.T) {
-	viewer, err := NewQRViewer()
+	viewer, err := NewQRViewer(0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +140,7 @@ func get(t *testing.T, target string) (*http.Response, string) {
 }
 
 func TestQRViewerRejectsOtherHostsAndExpiredPaths(t *testing.T) {
-	viewer, err := NewQRViewer()
+	viewer, err := NewQRViewer(0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,7 +187,7 @@ func TestQRViewerRejectsOtherHostsAndExpiredPaths(t *testing.T) {
 }
 
 func TestQRViewerReportsAnUnexpectedListenerFailure(t *testing.T) {
-	viewer, err := NewQRViewer()
+	viewer, err := NewQRViewer(0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -197,5 +199,48 @@ func TestQRViewerReportsAnUnexpectedListenerFailure(t *testing.T) {
 	}
 	if err := viewer.Close(); err == nil {
 		t.Fatal("Close did not retain the listener failure")
+	}
+}
+
+func TestQRViewerServesAtAFixedPort(t *testing.T) {
+	// Reserve a port the way a forwarded deployment would configure one.
+	probe, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := probe.Addr().(*net.TCPAddr).Port
+	if err := probe.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	viewer, err := NewQRViewer(port)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := viewer.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+	pageURL, err := viewer.Publish("https://opeco.link/join#secret", func(context.Context) (bool, error) { return false, nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := fmt.Sprintf("http://127.0.0.1:%d/qr/", port); !strings.HasPrefix(pageURL, want) {
+		t.Fatalf("viewer URL = %q, want prefix %q", pageURL, want)
+	}
+	response, _ := get(t, pageURL)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusOK)
+	}
+}
+
+func TestQRViewerRejectsPortsOutOfRange(t *testing.T) {
+	for _, port := range []int{-1, 65536} {
+		viewer, err := NewQRViewer(port)
+		if err == nil {
+			viewer.Close()
+			t.Fatalf("NewQRViewer(%d) accepted an invalid port", port)
+		}
 	}
 }
