@@ -34,8 +34,9 @@ func run() (runErr error) {
 	interactiveMode := flags.Bool("interactive", false, "run the long-lived interactive CLI instead of exporting a shell session")
 	noTerminalQR := flags.Bool("no-terminal-qr", false, "print the pairing URL without drawing a terminal QR code")
 	noBrowser := flags.Bool("no-browser", false, "do not open the QR image in the default browser (interactive and mcp modes)")
+	qrPort := flags.Int("qr-port", 0, "loopback port serving the QR image page (interactive and mcp modes); 0 picks a free port")
 	flags.Usage = func() {
-		fmt.Fprintln(flags.Output(), "Usage: eval \"$(opeco [--title TITLE] [--color COLOR])\"\n       opeco COMMAND [ARGS...]\n       opeco --interactive [--title TITLE]\n       opeco mcp\n\nCommands: join, pair, notify TEXT, status TEXT, color COLOR, request PROMPT OPTION OPTION..., close-request ID, responses, close")
+		fmt.Fprintln(flags.Output(), "Usage: eval \"$(opeco [--title TITLE] [--color COLOR])\"\n       opeco COMMAND [ARGS...]\n       opeco --interactive [--title TITLE]\n       opeco [--no-browser] [--qr-port PORT] mcp\n\nCommands: join, pair, notify TEXT, status TEXT, color COLOR, request PROMPT OPTION OPTION..., close-request ID, responses, close")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(os.Args[1:]); err != nil {
@@ -72,7 +73,7 @@ func run() (runErr error) {
 		return startShellSession(ctx, api, *title, *color, !*noTerminalQR && isCharacterDevice(os.Stderr), os.Stdout, os.Stderr)
 	}
 	store := notify.NewStore(api)
-	viewer, err := notify.NewQRViewer()
+	viewer, err := notify.NewQRViewer(*qrPort)
 	if err != nil {
 		return err
 	}

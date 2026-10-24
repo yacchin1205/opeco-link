@@ -85,6 +85,8 @@ The CLI prints a terminal QR code, its pairing URL, and a `QR image` URL such as
 
 The browser is not opened inside an SSH session, where it would appear on the remote display, and `--no-browser` suppresses it everywhere. The QR image URL is printed either way, so it can be opened by hand.
 
+The page is served on a random loopback port by default; `--qr-port` fixes the port. It only ever binds to `127.0.0.1`.
+
 The terminal QR code depends on the cell geometry of a terminal, so it is drawn only when `opeco` writes to one; redirected or piped output gets the two URLs alone. Pass `--no-terminal-qr` to suppress it on a terminal as well, when the block characters are noise, when the terminal is too narrow to render them, or when the screen is being shared or recorded. The pairing URL is still printed either way and remains a temporary secret.
 
 Session cards use a randomly selected pastel color by default. Pass `--color '#a1b2c3'` to choose an exact color at startup.
