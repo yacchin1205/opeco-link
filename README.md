@@ -83,7 +83,7 @@ opeco --interactive --title "Deployment"
 
 The CLI prints a terminal QR code, its pairing URL, and a `QR image` URL such as `http://127.0.0.1:49152/qr/...`, then opens that URL in the default browser without creating a file. The page shows a full-size QR code, the pairing link with a copy button, and a link to the App Store. Scan the QR code with the receiving device, or copy the link to open it in an app on the same computer. Once a device group joins through it, the page stops showing the pairing and closes its tab when the browser allows a script to close it. The CLI reports whether the browser opened, and reports when a new device group starts receiving the session.
 
-The browser is not opened inside an SSH session, where it would appear on the remote display, and `--no-browser` suppresses it everywhere. The QR image URL is printed either way, so it can be opened by hand.
+The browser is not opened inside an SSH session, where it would appear on the remote display, and `--no-browser` suppresses it everywhere. The QR image URL is printed either way, so it can be opened by hand. When the `BROWSER` environment variable is set, `opeco` runs that command with the URL as its only argument instead of the desktop's default opener, inside an SSH session as well.
 
 The page is served on a random loopback port by default; `--qr-port` fixes the port. It only ever binds to `127.0.0.1`.
 
@@ -158,7 +158,7 @@ Verified plaintext is written below the operating system's temporary directory, 
 
 `session_create` and `session_pairing_create` return `qr_image_url` and `pairing_url`. They do not return a terminal QR code: an MCP result is rendered by an agent before a person sees it, and neither `opeco` nor the agent can check that block characters survived that rendering intact.
 
-`opeco` opens `qr_image_url` in the default browser of its own machine and reports the outcome: `qr_opened` is true when the browser command succeeded, and `qr_open_error` otherwise explains why nothing opened, such as an SSH session, a missing `open` or `xdg-open`, or `--no-browser` in the MCP `args`. When nothing opened, ask the person to open `qr_image_url` in a browser.
+`opeco` opens `qr_image_url` in the default browser of its own machine, or with the command named by the `BROWSER` environment variable, and reports the outcome: `qr_opened` is true when the browser command succeeded, and `qr_open_error` otherwise explains why nothing opened, such as an SSH session, a missing `open` or `xdg-open`, or `--no-browser` in the MCP `args`. When nothing opened, ask the person to open `qr_image_url` in a browser.
 
 The page URL is reachable only from the same machine as the `opeco` process. When MCP runs in a container, on a remote host, or across SSH without port forwarding, use the pairing URL instead.
 
