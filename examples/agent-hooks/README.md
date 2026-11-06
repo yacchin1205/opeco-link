@@ -15,6 +15,33 @@ preserving existing hooks. For Codex, follow [Codex hooks](https://learn.chatgpt
 review the configuration with `/hooks`. For Claude, merge it into
 `.claude/settings.json` as described in [Claude hooks](https://code.claude.com/docs/en/hooks).
 
+While no session is running the hooks say nothing. An environment that wants
+its agents to pair without being asked, such as one where they are left to
+work for hours, passes the words for that as `without_session`, on the
+`UserPromptSubmit` event so that they arrive while the person is there:
+
+```json
+"UserPromptSubmit": [
+  {
+    "hooks": [
+      {
+        "type": "mcp_tool",
+        "server": "opeco-link",
+        "tool": "claude_hook_check",
+        "input": {
+          "event": "UserPromptSubmit",
+          "without_session": "No opeco.link session is running. Call session_create before you start."
+        },
+        "timeout": 3
+      }
+    ]
+  }
+]
+```
+
+For Codex the tool is `codex_hook_check`. Once a session runs, the words are
+no longer said.
+
 Pair a client normally and send feedback while the agent is working. Hooks run
 at lifecycle boundaries; they cannot immediately interrupt a running operation
 or wake an idle agent. A Stop hook asks the agent to continue at most once.

@@ -71,11 +71,11 @@ func (s *Server) Run(ctx context.Context) error {
 	}, s.waitResponses)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "codex_hook_check",
-		Description: "Codex lifecycle hook. Remind the agent about unread client responses and stale status without consuming responses or creating a session. Use responses_wait to retrieve responses and photos.",
+		Description: "Codex lifecycle hook. Remind the agent about unread client responses and stale status without consuming responses or creating a session. While no session is running, say only what without_session passes. Use responses_wait to retrieve responses and photos.",
 	}, s.checkHook)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "claude_hook_check",
-		Description: "Claude lifecycle hook. Remind the agent about unread client responses and stale status without consuming responses or creating a session. Use responses_wait to retrieve responses and photos.",
+		Description: "Claude lifecycle hook. Remind the agent about unread client responses and stale status without consuming responses or creating a session. While no session is running, say only what without_session passes. Use responses_wait to retrieve responses and photos.",
 	}, s.checkClaudeHook)
 
 	mcp.AddTool(server, &mcp.Tool{

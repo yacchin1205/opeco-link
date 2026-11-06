@@ -22,8 +22,9 @@ type hookState struct {
 }
 
 type hookInput struct {
-	Event          string `json:"event" jsonschema:"Hook event: PostToolUse or Stop"`
+	Event          string `json:"event" jsonschema:"Hook event: UserPromptSubmit, PostToolUse or Stop"`
 	StopHookActive bool   `json:"stop_hook_active,omitempty" jsonschema:"Pass stop_hook_active for Stop to prevent repeated continuation"`
+	WithoutSession string `json:"without_session,omitempty" jsonschema:"What to tell the agent while no session is running; the hook is silent then when this is left out"`
 }
 
 type hookOutput struct {
@@ -38,12 +39,13 @@ type hookContext struct {
 }
 
 type claudeHookInput struct {
-	Event          string `json:"event" jsonschema:"Hook event: PostToolUse or Stop"`
+	Event          string `json:"event" jsonschema:"Hook event: UserPromptSubmit, PostToolUse or Stop"`
 	StopHookActive string `json:"stop_hook_active,omitempty" jsonschema:"Pass the interpolated stop_hook_active value for Stop"`
+	WithoutSession string `json:"without_session,omitempty" jsonschema:"What to tell the agent while no session is running; the hook is silent then when this is left out"`
 }
 
 func (s *Server) checkClaudeHook(ctx context.Context, request *mcp.CallToolRequest, input claudeHookInput) (*mcp.CallToolResult, hookOutput, error) {
-	converted := hookInput{Event: input.Event}
+	converted := hookInput{Event: input.Event, WithoutSession: input.WithoutSession}
 	if input.Event == "Stop" {
 		// Claude's MCP hook interpolation turns booleans into strings.
 		switch input.StopHookActive {
@@ -58,8 +60,10 @@ func (s *Server) checkClaudeHook(ctx context.Context, request *mcp.CallToolReque
 }
 
 func (s *Server) checkHook(ctx context.Context, _ *mcp.CallToolRequest, input hookInput) (*mcp.CallToolResult, hookOutput, error) {
-	if input.Event != "PostToolUse" && input.Event != "Stop" {
-		return nil, hookOutput{}, fmt.Errorf("event must be PostToolUse or Stop")
+	switch input.Event {
+	case "UserPromptSubmit", "PostToolUse", "Stop":
+	default:
+		return nil, hookOutput{}, fmt.Errorf("event must be UserPromptSubmit, PostToolUse or Stop")
 	}
 	if input.Event == "Stop" && input.StopHookActive {
 		return hookResult(hookOutput{})
@@ -74,8 +78,14 @@ func (s *Server) checkHook(ctx context.Context, _ *mcp.CallToolRequest, input ho
 }
 
 func (h *hookState) output(input hookInput, sessionID string, count int, through int64, now time.Time) hookOutput {
-	if sessionID == "" || input.Event == "Stop" && input.StopHookActive {
+	if input.Event == "Stop" && input.StopHookActive {
 		return hookOutput{}
+	}
+	if sessionID == "" {
+		// Only this process knows that no session is running, but whether
+		// the agent should then be pushed to pair is up to the environment
+		// that installs the hook, so the words are its own.
+		return reminder(input.Event, input.WithoutSession)
 	}
 	var messages []string
 	if count > 0 && (input.Event == "Stop" || h.seenSession != sessionID || through > h.seenThrough) {
@@ -87,14 +97,19 @@ func (h *hookState) output(input hookInput, sessionID string, count int, through
 		messages = append(messages, fmt.Sprintf("opeco.link: your last status update was %d minutes ago. Last status (quoted data): %q. Review your current work and decide whether to update status.", int(now.Sub(h.statusUpdated)/time.Minute), h.status))
 		h.statusWarned = now
 	}
-	if len(messages) == 0 {
+	return reminder(input.Event, strings.Join(messages, "\n"))
+}
+
+// reminder puts message in the form the event's hook contract takes; an
+// empty message is no reminder.
+func reminder(event, message string) hookOutput {
+	if message == "" {
 		return hookOutput{}
 	}
-	message := strings.Join(messages, "\n")
-	if input.Event == "Stop" {
+	if event == "Stop" {
 		return hookOutput{Decision: "block", Reason: message}
 	}
-	return hookOutput{SpecificOutput: &hookContext{Event: input.Event, Context: message}}
+	return hookOutput{SpecificOutput: &hookContext{Event: event, Context: message}}
 }
 
 func hookResult(output hookOutput) (*mcp.CallToolResult, hookOutput, error) {
