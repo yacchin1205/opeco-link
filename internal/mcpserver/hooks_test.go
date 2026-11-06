@@ -127,15 +127,52 @@ func TestHookStatusLifecycle(t *testing.T) {
 
 func TestHookWithoutSessionIsSilent(t *testing.T) {
 	s := New(notify.NewStore(nil), nil, nil)
-	result, output, err := s.checkHook(context.Background(), nil, hookInput{Event: "Stop"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if output != (hookOutput{}) || len(result.Content) != 1 {
-		t.Fatalf("inactive hook = %+v", output)
+	for _, event := range []string{"UserPromptSubmit", "PostToolUse", "Stop"} {
+		result, output, err := s.checkHook(context.Background(), nil, hookInput{Event: event})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if output != (hookOutput{}) || len(result.Content) != 1 {
+			t.Fatalf("inactive %s hook = %+v", event, output)
+		}
 	}
 	if _, _, err := s.checkHook(context.Background(), nil, hookInput{Event: "unsupported"}); err == nil {
 		t.Fatal("unsupported event accepted")
+	}
+}
+
+// Whether an agent without a session is pushed to pair is up to whoever
+// installs the hook: the words it passes are said while no session runs,
+// every time, and never once one does.
+func TestHookSaysTheInstallersWordsWithoutSession(t *testing.T) {
+	const words = "pair before you start"
+	s := New(notify.NewStore(nil), nil, nil)
+	for range 2 {
+		_, output, err := s.checkHook(context.Background(), nil, hookInput{Event: "UserPromptSubmit", WithoutSession: words})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if output.Decision != "" || output.SpecificOutput == nil || *output.SpecificOutput != (hookContext{Event: "UserPromptSubmit", Context: words}) {
+			t.Fatalf("request without a session = %+v, want the installer's words every time", output)
+		}
+	}
+	_, stop, err := s.checkHook(context.Background(), nil, hookInput{Event: "Stop", WithoutSession: words})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stop != (hookOutput{Decision: "block", Reason: words}) {
+		t.Fatalf("Stop without a session = %+v, want the words in the form Stop takes", stop)
+	}
+	if _, again, err := s.checkHook(context.Background(), nil, hookInput{Event: "Stop", StopHookActive: true, WithoutSession: words}); err != nil || again != (hookOutput{}) {
+		t.Fatalf("continued Stop without a session = %+v err=%v, want it left to end", again, err)
+	}
+
+	var h hookState
+	if got := h.output(hookInput{Event: "UserPromptSubmit", WithoutSession: words}, "session", 0, 0, time.Now()); got != (hookOutput{}) {
+		t.Fatalf("request with a session = %+v", got)
+	}
+	if got := h.output(hookInput{Event: "UserPromptSubmit", WithoutSession: words}, "session", 1, 1, time.Now()); got.SpecificOutput == nil || !strings.Contains(got.SpecificOutput.Context, "responses_wait") || strings.Contains(got.SpecificOutput.Context, words) {
+		t.Fatalf("request with unread responses = %+v, want the reminder a tool call gets and nothing else", got)
 	}
 }
 
@@ -178,7 +215,7 @@ func TestHookPreservesAPIError(t *testing.T) {
 }
 
 func TestHookMCPTextMatchesStructuredOutput(t *testing.T) {
-	for _, event := range []string{"PostToolUse", "Stop"} {
+	for _, event := range []string{"UserPromptSubmit", "PostToolUse", "Stop"} {
 		var h hookState
 		result, output, err := hookResult(h.output(hookInput{Event: event}, "session", 1, 1, time.Now()))
 		if err != nil {
@@ -205,6 +242,7 @@ func TestHookMCPTextMatchesStructuredOutput(t *testing.T) {
 func TestClaudeHookInput(t *testing.T) {
 	s := New(notify.NewStore(nil), nil, nil)
 	for _, input := range []claudeHookInput{
+		{Event: "UserPromptSubmit"},
 		{Event: "PostToolUse"},
 		{Event: "Stop", StopHookActive: "false"},
 		{Event: "Stop", StopHookActive: "true"},
@@ -212,6 +250,9 @@ func TestClaudeHookInput(t *testing.T) {
 		if _, output, err := s.checkClaudeHook(context.Background(), nil, input); err != nil || output != (hookOutput{}) {
 			t.Fatalf("Claude input %+v: output=%+v err=%v", input, output, err)
 		}
+	}
+	if _, output, err := s.checkClaudeHook(context.Background(), nil, claudeHookInput{Event: "UserPromptSubmit", WithoutSession: "pair"}); err != nil || output.SpecificOutput == nil || output.SpecificOutput.Context != "pair" {
+		t.Fatalf("Claude request without a session: output=%+v err=%v", output, err)
 	}
 	for _, value := range []string{"", "invalid", "0"} {
 		if _, _, err := s.checkClaudeHook(context.Background(), nil, claudeHookInput{Event: "Stop", StopHookActive: value}); err == nil {
