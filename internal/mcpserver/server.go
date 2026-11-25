@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -11,17 +12,49 @@ import (
 	"opeco.link/internal/notify"
 )
 
-const instructions = "Call session_create for the work the user wants to follow; it returns the session this process is already running when there is one, so an agent never manages more than one session and never asks for a second QR code. Add a device with session_pairing_create, and start a separate session only by closing the running one first, at the user's request. opeco opens the QR image in the browser on its own machine when it can: qr_opened true means the person can scan the browser window now, while qr_open_error explains why nothing opened, in which case give them the local QR image URL, or the pairing URL when their browser is on another machine. Do not claim a device is paired until session_wait_for_device confirms it, and do not send events before that. Send status and notifications as work changes. Every send result may carry responses from devices, including messages the user wrote without being asked; read that field every time, because responses are handed over once and nothing else will surface them. A request may have multiple choices. Forward every response to the agent; opeco does not select or aggregate responses. Close a session only when immediate removal is intended; normal process exit leaves it to expire."
+const instructions = "Call session_create for the work the user wants to follow; it returns the session already running when there is one, this process's or, where the machine keeps one session for all its agents, the machine's, so an agent never manages more than one session and never asks for a second QR code. Add a device with session_pairing_create, and start a separate session only by closing the running one first, at the user's request. opeco opens the QR image in the browser on its own machine when it can: qr_opened true means the person can scan the browser window now, while qr_open_error explains why nothing opened, in which case give them the local QR image URL, or the pairing URL when their browser is on another machine. Do not claim a device is paired until session_wait_for_device confirms it, and do not send events before that. Send status and notifications as work changes. Every send result may carry responses from devices, including messages the user wrote without being asked; read that field every time, because responses are handed over once and nothing else will surface them. A request may have multiple choices. Forward every response to the agent; opeco does not select or aggregate responses. Close a session only when immediate removal is intended; normal process exit leaves it to expire."
 
 type Server struct {
-	store  *notify.Store
-	viewer *notify.QRViewer
-	opener browser.Opener
-	hooks  hookState
+	sessions Sessions
+	viewer   *notify.QRViewer
+	opener   browser.Opener
+	hooks    hookState
 }
 
-func New(store *notify.Store, viewer *notify.QRViewer, opener browser.Opener) *Server {
-	return &Server{store: store, viewer: viewer, opener: opener}
+// Sessions is where the server's session lives: in this process, or in a
+// directory every opeco process of the machine shares.
+type Sessions interface {
+	EnsureSession(ctx context.Context, title, color string) (notify.SessionState, error)
+	// Use runs fn on the store that holds the session.
+	Use(ctx context.Context, sessionID string, fn func(*notify.Store) error) error
+	PendingResponses(ctx context.Context) (sessionID string, count int, through int64, err error)
+}
+
+// InProcess keeps the session in this process's memory: it ends with the
+// process.
+func InProcess(store *notify.Store) Sessions { return inProcess{store} }
+
+type inProcess struct{ store *notify.Store }
+
+func (p inProcess) EnsureSession(ctx context.Context, title, color string) (notify.SessionState, error) {
+	return p.store.EnsureSession(ctx, title, color)
+}
+
+func (p inProcess) Use(_ context.Context, _ string, fn func(*notify.Store) error) error {
+	return fn(p.store)
+}
+
+func (p inProcess) PendingResponses(ctx context.Context) (string, int, int64, error) {
+	return p.store.PendingResponses(ctx)
+}
+
+func New(sessions Sessions, viewer *notify.QRViewer, opener browser.Opener) *Server {
+	return &Server{sessions: sessions, viewer: viewer, opener: opener}
+}
+
+// use runs fn on the store that holds the session.
+func (s *Server) use(ctx context.Context, sessionID string, fn func(*notify.Store) error) error {
+	return s.sessions.Use(ctx, sessionID, fn)
 }
 
 func (s *Server) Run(ctx context.Context) error {
@@ -35,7 +68,7 @@ func (s *Server) Run(ctx context.Context) error {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "session_create",
-		Description: "Return the session this process is already running, or create one when there is none. A session identifies the agent, so do not expect a second one: to start a separate session, close the running one first. The pairing URL and QR image URL are returned only while no device group has joined yet.",
+		Description: "Return the session already running, this process's or the one the machine keeps for all its agents, or create one when there is none. A session identifies the agent, so do not expect a second one: to start a separate session, close the running one first. The pairing URL and QR image URL are returned only while no device group has joined yet.",
 	}, s.create)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "session_pairing_create",
@@ -121,7 +154,7 @@ type pairingOutput struct {
 }
 
 func (s *Server) create(ctx context.Context, _ *mcp.CallToolRequest, input createInput) (*mcp.CallToolResult, sessionOutput, error) {
-	state, err := s.store.EnsureSession(ctx, input.Title, input.Color)
+	state, err := s.sessions.EnsureSession(ctx, input.Title, input.Color)
 	if err != nil {
 		return nil, sessionOutput{}, err
 	}
@@ -133,9 +166,7 @@ func (s *Server) create(ctx context.Context, _ *mcp.CallToolRequest, input creat
 		PairingURL:       state.PairingURL,
 	}
 	if state.PairingURL != "" {
-		imageURL, err := s.viewer.Publish(state.PairingURL, func(ctx context.Context) (bool, error) {
-			return s.store.PairingJoined(ctx, state.SessionID, state.PairingURL)
-		})
+		imageURL, err := s.viewer.Publish(state.PairingURL, s.pairingJoined(state.SessionID, state.PairingURL))
 		if err != nil {
 			return nil, sessionOutput{}, err
 		}
@@ -157,13 +188,15 @@ type sessionInput struct {
 }
 
 func (s *Server) addPairing(ctx context.Context, _ *mcp.CallToolRequest, input sessionInput) (*mcp.CallToolResult, pairingOutput, error) {
-	pairingURL, err := s.store.AddPairing(ctx, input.SessionID)
+	var pairingURL string
+	err := s.use(ctx, input.SessionID, func(store *notify.Store) (err error) {
+		pairingURL, err = store.AddPairing(ctx, input.SessionID)
+		return err
+	})
 	if err != nil {
 		return nil, pairingOutput{}, err
 	}
-	imageURL, err := s.viewer.Publish(pairingURL, func(ctx context.Context) (bool, error) {
-		return s.store.PairingJoined(ctx, input.SessionID, pairingURL)
-	})
+	imageURL, err := s.viewer.Publish(pairingURL, s.pairingJoined(input.SessionID, pairingURL))
 	if err != nil {
 		return nil, pairingOutput{}, err
 	}
@@ -186,7 +219,17 @@ func (s *Server) waitForDevice(ctx context.Context, _ *mcp.CallToolRequest, inpu
 	if err != nil {
 		return nil, waitDeviceOutput{}, err
 	}
-	count, err := s.store.WaitForGroups(ctx, input.SessionID, timeout)
+	var count int
+	err = poll(ctx, timeout, func() (bool, error) {
+		err := s.use(ctx, input.SessionID, func(store *notify.Store) (err error) {
+			count, err = store.RefreshGroups(ctx, input.SessionID)
+			return err
+		})
+		return count > 0, err
+	})
+	if errors.Is(err, errTimedOut) {
+		return nil, waitDeviceOutput{}, context.DeadlineExceeded
+	}
 	if err != nil {
 		return nil, waitDeviceOutput{}, err
 	}
@@ -210,7 +253,11 @@ type notifiedOutput struct {
 }
 
 func (s *Server) notify(ctx context.Context, _ *mcp.CallToolRequest, input messageInput) (*mcp.CallToolResult, notifiedOutput, error) {
-	itemID, err := s.store.SendNotify(ctx, input.SessionID, input.Message)
+	var itemID string
+	err := s.use(ctx, input.SessionID, func(store *notify.Store) (err error) {
+		itemID, err = store.SendNotify(ctx, input.SessionID, input.Message)
+		return err
+	})
 	if err != nil {
 		return nil, notifiedOutput{}, err
 	}
@@ -225,7 +272,9 @@ type statusInput struct {
 
 func (s *Server) status(ctx context.Context, _ *mcp.CallToolRequest, input statusInput) (*mcp.CallToolResult, deliveredOutput, error) {
 	s.hooks.mu.Lock()
-	err := s.store.SendStatus(ctx, input.SessionID, input.Status)
+	err := s.use(ctx, input.SessionID, func(store *notify.Store) error {
+		return store.SendStatus(ctx, input.SessionID, input.Status)
+	})
 	if err == nil {
 		s.hooks.statusSession, s.hooks.status = input.SessionID, input.Status
 		s.hooks.statusUpdated = time.Now()
@@ -245,7 +294,9 @@ type colorInput struct {
 }
 
 func (s *Server) color(ctx context.Context, _ *mcp.CallToolRequest, input colorInput) (*mcp.CallToolResult, deliveredOutput, error) {
-	if err := s.store.SetColor(ctx, input.SessionID, input.Color); err != nil {
+	if err := s.use(ctx, input.SessionID, func(store *notify.Store) error {
+		return store.SetColor(ctx, input.SessionID, input.Color)
+	}); err != nil {
 		return nil, deliveredOutput{}, err
 	}
 	responses := s.drainResponses(ctx, input.SessionID)
@@ -265,7 +316,12 @@ type requestOutput struct {
 }
 
 func (s *Server) request(ctx context.Context, _ *mcp.CallToolRequest, input requestInput) (*mcp.CallToolResult, requestOutput, error) {
-	requestID, choices, err := s.store.SendRequest(ctx, input.SessionID, input.Prompt, input.Options)
+	var requestID string
+	var choices []notify.Choice
+	err := s.use(ctx, input.SessionID, func(store *notify.Store) (err error) {
+		requestID, choices, err = store.SendRequest(ctx, input.SessionID, input.Prompt, input.Options)
+		return err
+	})
 	if err != nil {
 		return nil, requestOutput{}, err
 	}
@@ -279,7 +335,9 @@ type closeRequestInput struct {
 }
 
 func (s *Server) closeRequest(ctx context.Context, _ *mcp.CallToolRequest, input closeRequestInput) (*mcp.CallToolResult, closeOutput, error) {
-	if err := s.store.CloseRequest(ctx, input.SessionID, input.RequestID); err != nil {
+	if err := s.use(ctx, input.SessionID, func(store *notify.Store) error {
+		return store.CloseRequest(ctx, input.SessionID, input.RequestID)
+	}); err != nil {
 		return nil, closeOutput{}, err
 	}
 	responses := s.drainResponses(ctx, input.SessionID)
@@ -295,7 +353,17 @@ func (s *Server) waitResponses(ctx context.Context, _ *mcp.CallToolRequest, inpu
 	if err != nil {
 		return nil, responsesOutput{}, err
 	}
-	responses, err := s.store.WaitResponses(ctx, input.SessionID, timeout)
+	var responses []notify.Response
+	err = poll(ctx, timeout, func() (bool, error) {
+		err := s.use(ctx, input.SessionID, func(store *notify.Store) (err error) {
+			responses, err = store.Responses(ctx, input.SessionID)
+			return err
+		})
+		return len(responses) > 0, err
+	})
+	if errors.Is(err, errTimedOut) {
+		responses, err = []notify.Response{}, nil
+	}
 	if err != nil {
 		return nil, responsesOutput{}, err
 	}
@@ -311,7 +379,9 @@ func (s *Server) close(ctx context.Context, _ *mcp.CallToolRequest, input sessio
 	// Closing discards whatever the session still holds, so hand over unread
 	// responses first rather than dropping a device message silently.
 	responses := s.drainResponses(ctx, input.SessionID)
-	if err := s.store.Close(ctx, input.SessionID); err != nil {
+	if err := s.use(ctx, input.SessionID, func(store *notify.Store) error {
+		return store.Close(ctx, input.SessionID)
+	}); err != nil {
 		return nil, closeOutput{}, err
 	}
 	return attachmentContent(responses), closeOutput{Closed: true, Responses: responses}, nil
@@ -349,11 +419,50 @@ func attachmentContent(responses []notify.Response) *mcp.CallToolResult {
 // failure. Responses are handed over once, so a caller that ignores this field
 // will not see them again.
 func (s *Server) drainResponses(ctx context.Context, sessionID string) []notify.Response {
-	responses, err := s.store.Responses(ctx, sessionID)
+	var responses []notify.Response
+	err := s.use(ctx, sessionID, func(store *notify.Store) (err error) {
+		responses, err = store.Responses(ctx, sessionID)
+		return err
+	})
 	if err != nil {
 		return nil
 	}
 	return responses
+}
+
+func (s *Server) pairingJoined(sessionID, pairingURL string) func(context.Context) (bool, error) {
+	return func(ctx context.Context) (joined bool, err error) {
+		err = s.use(ctx, sessionID, func(store *notify.Store) (err error) {
+			joined, err = store.PairingJoined(ctx, sessionID, pairingURL)
+			return err
+		})
+		return joined, err
+	}
+}
+
+var errTimedOut = errors.New("timed out")
+
+// poll checks once a second until check reports done or the timeout passes.
+// It holds nothing between checks, so a session shared with other processes
+// is theirs to use while this one waits.
+func poll(ctx context.Context, timeout time.Duration, check func() (bool, error)) error {
+	deadline := time.NewTimer(timeout)
+	defer deadline.Stop()
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		done, err := check()
+		if err != nil || done {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-deadline.C:
+			return errTimedOut
+		case <-ticker.C:
+		}
+	}
 }
 
 func timeoutDuration(seconds int) (time.Duration, error) {

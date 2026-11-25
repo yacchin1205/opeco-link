@@ -60,7 +60,11 @@ func run() (runErr error) {
 		if invalidFlag != "" {
 			return fmt.Errorf("--%s is only used when starting a session; commands use OPECO_SESSION_FILE", invalidFlag)
 		}
-		return shellCommand(ctx, os.Getenv("OPECO_SESSION_FILE"), flags.Args(), !*noTerminalQR && isCharacterDevice(os.Stdout), os.Stdout)
+		path, err := shellSessionPath(os.Getenv("OPECO_SESSION_FILE"))
+		if err != nil {
+			return err
+		}
+		return shellCommand(ctx, path, flags.Args(), !*noTerminalQR && isCharacterDevice(os.Stdout), os.Stdout)
 	}
 	if flags.NArg() > 1 {
 		return fmt.Errorf("mcp does not take arguments")
@@ -87,7 +91,11 @@ func run() (runErr error) {
 	}
 	operation := func(ctx context.Context) error {
 		if flags.NArg() == 1 {
-			return mcpserver.New(store, viewer, opener).Run(ctx)
+			sessions, err := mcpSessions(store, api)
+			if err != nil {
+				return err
+			}
+			return mcpserver.New(sessions, viewer, opener).Run(ctx)
 		}
 		terminalQR := !*noTerminalQR && isCharacterDevice(os.Stdout)
 		return interactive(ctx, store, viewer, opener, *title, *color, terminalQR, os.Stdin, os.Stdout, os.Stderr)
@@ -97,6 +105,39 @@ func run() (runErr error) {
 		return nil
 	}
 	return err
+}
+
+// mcpSessions keeps the MCP server's session in this process, or in the
+// session_dir the owner configured.
+func mcpSessions(store *notify.Store, api *notify.API) (mcpserver.Sessions, error) {
+	cfg, err := loadConfig()
+	if err != nil {
+		return nil, err
+	}
+	if cfg.SessionDir == "" {
+		return mcpserver.InProcess(store), nil
+	}
+	return notify.NewSharedSessions(cfg.SessionDir, api)
+}
+
+// shellSessionPath is the shell's own session, or else the configured
+// session_dir's.
+func shellSessionPath(own string) (string, error) {
+	if own != "" {
+		return own, nil
+	}
+	cfg, err := loadConfig()
+	if err != nil {
+		return "", err
+	}
+	if cfg.SessionDir == "" {
+		return "", nil
+	}
+	path, err := notify.SharedStatePath(cfg.SessionDir)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", fmt.Errorf("%w; an agent's session_create starts the session there", err)
+	}
+	return path, err
 }
 
 // isCharacterDevice reports whether output goes to a terminal. A block-character
