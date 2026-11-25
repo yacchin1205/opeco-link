@@ -162,6 +162,18 @@ Verified plaintext is written below the operating system's temporary directory, 
 
 The page URL is reachable only from the same machine as the `opeco` process. When MCP runs in a container, on a remote host, or across SSH without port forwarding, use the pairing URL instead.
 
+### One session for the machine
+
+Each MCP process keeps its session in memory, so a new agent process starts a new session and asks for another pairing. Where agents start over and over, as on a machine that runs them on a schedule, the machine's owner can keep one session for all of them in a directory:
+
+```json
+{"session_dir": "/var/lib/opeco"}
+```
+
+in `~/.opeco/config.json`. The directory must exist, be absolute, and be private to its owner (`0700`). Every `opeco mcp` of that user then uses the session kept there: `session_create` returns it when it exists and creates it there when it does not, and the shell commands (`opeco status ...`) use it when `OPECO_SESSION_FILE` is not set. The session keeps opeco.link's lifetime; once it has expired or been closed, the next `session_create` starts another, which needs pairing again.
+
+The agents share one response cursor: a response goes to the first process that reads it. The setting is a file rather than a flag because it puts the session's keys on disk (see Security notes), and a flag in an agent's MCP settings is one the agent can add itself.
+
 Use [Agent hooks](examples/agent-hooks/README.md) with Codex or Claude to receive
 new-response reminders and reminders to update stale status.
 
@@ -169,7 +181,7 @@ new-response reminders and reminders to update stale status.
 
 - Treat an unused pairing QR code or URL as a temporary secret.
 - Local invitation pages use an opaque, independently generated loopback URL. The URL contains no pairing data and expires after 10 minutes, but anyone who can view the page can use the underlying one-shot pairing secret. The page loads nothing from other origins. Interactive and MCP modes open the page in the default browser of the machine running `opeco`, so on a shared or remotely viewed display start `opeco` with `--no-browser`.
-- Interactive and MCP session management keys exist only in process memory. Shell sessions keep keys and authentication state in an OS temporary directory (`0700`) and file (`0600`) where those modes apply. Treat that file as a secret: anyone who can read it can control the session and decrypt its messages. Do not share, back up, or commit it. Cleanup is not secure erasure, and missing keys are not recoverable.
+- Interactive and MCP session management keys exist only in process memory, unless `session_dir` is configured: then the MCP session's keys and authentication state are in that directory, under the same rules as a shell session's below, for as long as the session lives. Shell sessions keep keys and authentication state in an OS temporary directory (`0700`) and file (`0600`) where those modes apply. Treat that file as a secret: anyone who can read it can control the session and decrypt its messages. Do not share, back up, or commit it. Cleanup is not secure erasure, and missing keys are not recoverable.
 - The relay can observe metadata such as timestamps, identifiers, and ciphertext sizes.
 - Attachment objects in R2 are ciphertext only. They are removed after `opeco` has advanced past the response and polls again, or when the session expires; an uploaded attachment that is never committed can remain until session expiry.
 - Compromise of the served web application, the browser profile, or the CLI process is outside the end-to-end encryption guarantee.

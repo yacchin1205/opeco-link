@@ -126,7 +126,7 @@ func TestHookStatusLifecycle(t *testing.T) {
 }
 
 func TestHookWithoutSessionIsSilent(t *testing.T) {
-	s := New(notify.NewStore(nil), nil, nil)
+	s := New(InProcess(notify.NewStore(nil)), nil, nil)
 	for _, event := range []string{"UserPromptSubmit", "PostToolUse", "Stop"} {
 		result, output, err := s.checkHook(context.Background(), nil, hookInput{Event: event})
 		if err != nil {
@@ -146,7 +146,7 @@ func TestHookWithoutSessionIsSilent(t *testing.T) {
 // every time, and never once one does.
 func TestHookSaysTheInstallersWordsWithoutSession(t *testing.T) {
 	const words = "pair before you start"
-	s := New(notify.NewStore(nil), nil, nil)
+	s := New(InProcess(notify.NewStore(nil)), nil, nil)
 	for range 2 {
 		_, output, err := s.checkHook(context.Background(), nil, hookInput{Event: "UserPromptSubmit", WithoutSession: words})
 		if err != nil {
@@ -196,7 +196,7 @@ func TestHookPreservesAPIError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := New(store, nil, nil)
+	s := New(InProcess(store), nil, nil)
 	_, _, err = s.checkHook(context.Background(), nil, hookInput{Event: "Stop"})
 	var apiError *notify.APIError
 	if !errors.As(err, &apiError) || apiError.Code != "test_failure" || apiError.Message != "original cause" {
@@ -240,7 +240,7 @@ func TestHookMCPTextMatchesStructuredOutput(t *testing.T) {
 }
 
 func TestClaudeHookInput(t *testing.T) {
-	s := New(notify.NewStore(nil), nil, nil)
+	s := New(InProcess(notify.NewStore(nil)), nil, nil)
 	for _, input := range []claudeHookInput{
 		{Event: "UserPromptSubmit"},
 		{Event: "PostToolUse"},

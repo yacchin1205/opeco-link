@@ -70,7 +70,7 @@ func (s *Server) checkHook(ctx context.Context, _ *mcp.CallToolRequest, input ho
 	}
 	s.hooks.mu.Lock()
 	defer s.hooks.mu.Unlock()
-	sessionID, count, through, err := s.store.PendingResponses(ctx)
+	sessionID, count, through, err := s.sessions.PendingResponses(ctx)
 	if err != nil {
 		return nil, hookOutput{}, err
 	}

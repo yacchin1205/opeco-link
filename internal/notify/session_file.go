@@ -37,8 +37,14 @@ type savedSession struct {
 	ProtocolVersion int                 `json:"protocolVersion"`
 }
 
-func CreateSessionFile(ctx context.Context, api *API, title, color string) (_ *SessionFile, _ string, err error) {
-	directory, err := os.MkdirTemp("", "opeco-session-")
+func CreateSessionFile(ctx context.Context, api *API, title, color string) (*SessionFile, string, error) {
+	return createSessionFileIn(ctx, api, "", title, color)
+}
+
+// createSessionFileIn creates the session's private directory under parent,
+// or under the OS temporary directory when parent is empty.
+func createSessionFileIn(ctx context.Context, api *API, parent, title, color string) (_ *SessionFile, _ string, err error) {
+	directory, err := os.MkdirTemp(parent, "opeco-session-")
 	if err != nil {
 		return nil, "", err
 	}
